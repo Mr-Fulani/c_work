@@ -1,0 +1,10 @@
+Flask
+Flask-Login
+Flask-Bcrypt
+Flask-Mail
+Flask-SQLAlchemy
+stripe
+pytest
+pytest-flask
+
+Flask-Migrate
