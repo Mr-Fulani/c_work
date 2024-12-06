@@ -1,0 +1,33 @@
+<!-- app/templates/home.html -->
+
+{% extends "base.html" %}
+
+{% block title %}Главная - c_work{% endblock %}
+
+{% block content %}
+    <div class="jumbotron mt-4">
+        <h1 class="display-4">Добро пожаловать в c_work!</h1>
+        <p class="lead">Управляйте своими бронированиями и участвуйте в разнообразных классах.</p>
+        <hr class="my-4">
+        {% if not current_user.is_authenticated %}
+            <p>Начните с регистрации или входа в систему.</p>
+            <a class="btn btn-primary btn-lg" href="{{ url_for('main.register') }}" role="button">Регистрация</a>
+            <a class="btn btn-secondary btn-lg" href="{{ url_for('main.login') }}" role="button">Вход</a>
+        {% else %}
+            <p>Перейдите к просмотру доступных классов или ваших бронирований.</p>
+            <a class="btn btn-info btn-lg" href="{{ url_for('main.classes') }}" role="button">Классы</a>
+            <a class="btn btn-warning btn-lg" href="{{ url_for('main.my_bookings') }}" role="button">Мои Бронирования</a>
+        {% endif %}
+    </div>
+
+    <h3 class="mt-5 mb-3 text-center">Доступные Классы</h3>
+    <div class="row">
+        {% for class in classes %}
+        <div class="col-md-4 mb-4">
+            {% set extended = False %}
+            {% set class_ = class %}
+            {% include 'partials/class_card.html' %}
+        </div>
+        {% endfor %}
+    </div>
+{% endblock %}

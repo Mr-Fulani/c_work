@@ -1,0 +1,18 @@
+<!-- app/templates/classes.html -->
+
+{% extends "base.html" %}
+
+{% block title %}Классы - c_work{% endblock %}
+
+{% block content %}
+    <h2 class="mt-5">Доступные Классы</h2>
+    <div class="row mt-3">
+        {% for class in classes %}
+        <div class="col-md-4 mb-4">
+            {% set extended = False %}
+            {% set class_ = class %}
+            {% include 'partials/class_card.html' %}
+        </div>
+        {% endfor %}
+    </div>
+{% endblock %}

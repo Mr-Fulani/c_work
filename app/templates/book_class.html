@@ -1,0 +1,22 @@
+<!-- app/templates/book_class.html -->
+
+{% extends "base.html" %}
+
+{% block title %}Бронирование Класса - c_work{% endblock %}
+
+{% block content %}
+    <h2 class="mt-5 mb-4 text-center">Бронирование Класса "{{ class_.name }}"</h2>
+    <form method="POST">
+        <div class="form-group">
+            <label for="day">Choose a Day of the Week</label>
+            <select class="form-control" id="day" name="day" required>
+                <option value="" disabled selected>-- Выберите день --</option>
+                {% for day in available_days %}
+                    <option value="{{ day }}">{{ day }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-success">Забронировать</button>
+        <a href="{{ url_for('main.classes') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+{% endblock %}

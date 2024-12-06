@@ -1,0 +1,36 @@
+<!-- app/templates/edit_class.html -->
+
+{% extends "base.html" %}
+
+{% block title %}Редактировать Класс - c_work{% endblock %}
+
+{% block content %}
+    <h2 class="mt-5 mb-4 text-center">Редактировать Класс</h2>
+    <form method="POST">
+        <div class="form-group">
+            <label for="name">Название Класса</label>
+            <input type="text" class="form-control" id="name" name="name" value="{{ class_.name }}" required>
+        </div>
+        <div class="form-group">
+            <label for="description">Описание</label>
+            <textarea class="form-control" id="description" name="description" rows="3">{{ class_.description }}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="schedule">Расписание (YYYY-MM-DD HH:MM)</label>
+            <input type="text" class="form-control" id="schedule" name="schedule" value="{{ class_.schedule.strftime('%Y-%m-%d %H:%M') }}" required>
+        </div>
+        <div class="form-group">
+            <label for="capacity">Вместимость</label>
+            <input type="number" class="form-control" id="capacity" name="capacity" value="{{ class_.capacity }}" min="1" required>
+        </div>
+        <div class="form-group">
+            <label for="days_of_week">Дни Недели</label>
+            <input type="text" class="form-control" id="days_of_week" name="days_of_week" value="{{ class_.days_of_week }}" placeholder="Пн, Ср, Пт">
+        </div>
+        <div class="form-group">
+            <label for="extra_info">Дополнительная Информация</label>
+            <textarea class="form-control" id="extra_info" name="extra_info" rows="3">{{ class_.extra_info }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить Изменения</button>
+    </form>
+{% endblock %}

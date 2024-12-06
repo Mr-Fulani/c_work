@@ -1,0 +1,33 @@
+<!-- app/templates/my_bookings.html -->
+
+{% extends "base.html" %}
+
+{% block title %}Мои Бронирования - c_work{% endblock %}
+
+{% block content %}
+    <h2 class="mt-5">Мои Бронирования</h2>
+    {% if bookings %}
+        <table class="table table-striped mt-3">
+            <thead>
+                <tr>
+                    <th>Класс</th>
+                    <th>День Недели</th>
+                    <th>Дата Бронирования</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for booking in bookings %}
+                <tr>
+                    <td>{{ booking.class_.name }}</td>
+                    <td>{{ booking.day }}</td>
+                    <td>{{ booking.booking_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>{{ booking.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>У вас пока нет бронирований.</p>
+    {% endif %}
+{% endblock %}

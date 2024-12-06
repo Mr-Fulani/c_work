@@ -1,0 +1,69 @@
+<!-- app/templates/admin_panel.html -->
+{% extends "base.html" %}
+
+{% block title %}Панель Администратора - c_work{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mt-5 mb-4 text-center">Панель Администратора</h2>
+
+    <!-- Управление Классами -->
+    <h3 class="mt-4 mb-3 text-center">Классы</h3>
+    <div class="text-center mb-4">
+        <a href="{{ url_for('admin.add_class') }}" class="btn btn-success">Добавить Класс</a>
+    </div>
+
+    <div class="row">
+        {% for class in classes %}
+        <div class="col-md-4 mb-4">
+            {% set extended = True %}
+            {% set class_ = class %}
+            {% include 'partials/class_card.html' %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Управление Пользователями -->
+    <h3 class="mt-5 mb-3 text-center">Пользователи</h3>
+    <div class="row">
+        {% for user in users %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <img src="{{ url_for('static', filename='images/user.png') }}" class="card-img-top" alt="User Image">
+                <div class="card-body">
+                    <h5 class="card-title">{{ user.username }}</h5>
+                    <p class="card-text">
+                        <strong>Email:</strong> {{ user.email }}<br>
+                        <strong>Администратор:</strong> {{ 'Да' if user.is_admin else 'Нет' }}
+                    </p>
+                    <button class="btn btn-info btn-sm toggle-details" data-target="#user-details-{{ user.id }}">Подробнее</button>
+                    <div id="user-details-{{ user.id }}" class="mt-3 d-none">
+                        <!-- Дополнительная информация о пользователе -->
+                        <p><strong>ID:</strong> {{ user.id }}</p>
+                        <p><strong>Количество бронирований:</strong> {{ user.bookings|length }}</p>
+                        <!-- Добавьте больше информации при необходимости -->
+                    </div>
+                </div>
+                <div class="card-footer d-flex justify-content-between">
+                    {% if not user.is_admin %}
+                        <form action="{{ url_for('admin.promote_user', user_id=user.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-success btn-sm">Назначить Админом</button>
+                        </form>
+                    {% else %}
+                        {% if user.id != current_user.id %}
+                            <form action="{{ url_for('admin.demote_user', user_id=user.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-warning btn-sm">Понизить из Админов</button>
+                            </form>
+                        {% endif %}
+                    {% endif %}
+
+                    <form action="{{ url_for('admin.delete_user', user_id=user.id) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Вы уверены, что хотите удалить этого пользователя?');">Удалить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

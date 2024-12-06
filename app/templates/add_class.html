@@ -1,0 +1,36 @@
+<!-- app/templates/add_class.html -->
+
+{% extends "base.html" %}
+
+{% block title %}Добавить Класс - c_work{% endblock %}
+
+{% block content %}
+    <h2 class="mt-5 mb-4 text-center">Добавить Новый Класс</h2>
+    <form method="POST">
+        <div class="form-group">
+            <label for="name">Название Класса</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+        </div>
+        <div class="form-group">
+            <label for="description">Описание</label>
+            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="schedule">Расписание (YYYY-MM-DD HH:MM)</label>
+            <input type="text" class="form-control" id="schedule" name="schedule" placeholder="2024-12-31 18:00" required>
+        </div>
+        <div class="form-group">
+            <label for="capacity">Вместимость</label>
+            <input type="number" class="form-control" id="capacity" name="capacity" value="10" min="1" required>
+        </div>
+        <div class="form-group">
+            <label for="days_of_week">Дни Недели</label>
+            <input type="text" class="form-control" id="days_of_week" name="days_of_week" placeholder="Пн, Ср, Пт">
+        </div>
+        <div class="form-group">
+            <label for="extra_info">Дополнительная Информация</label>
+            <textarea class="form-control" id="extra_info" name="extra_info" rows="3"></textarea>
+        </div>
+        <button type="submit" class="btn btn-success">Добавить Класс</button>
+    </form>
+{% endblock %}
