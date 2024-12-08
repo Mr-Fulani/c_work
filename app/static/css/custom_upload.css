@@ -1,0 +1,38 @@
+/*
+custom_upload.css
+
+Стили для красивой кнопки загрузки файла.
+Скрываем стандартный input и используем label в качестве кнопки.
+*/
+
+.custom-file-upload {
+    position: relative;
+    display: inline-block;
+    max-width: 300px;
+}
+
+.upload-label {
+    display: inline-block;
+    padding: 10px 20px;
+    background: var(--primary, #ef4444);
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    font-size: 14px;
+}
+
+.upload-label:hover {
+    background: var(--primary-light, #f87171);
+}
+
+#file-chosen {
+    margin-left: 10px;
+    font-size: 0.9em;
+    color: var(--grey, #6C7486);
+}
+
+/* Скрываем стандартный input file */
+#image_input {
+    display: none;
+}
