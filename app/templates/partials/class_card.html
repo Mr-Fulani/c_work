@@ -1,54 +1,64 @@
 <!-- app/templates/partials/class_card.html -->
 
-<div class="card h-100 shadow-sm">
-    <img src="{{ url_for('static', filename='images/class.png') }}" class="card-img-top" alt="Class Image">
-    <div class="card-body">
-        <h5 class="card-title">{{ class_.name }}</h5>
-        <p class="card-text">
-            <strong>Описание:</strong> {{ class_.description or 'Нет описания' }}<br>
-            <strong>Расписание:</strong> {{ class_.schedule.strftime('%Y-%m-%d %H:%M') }}<br>
-            <strong>Вместимость:</strong> {{ class_.capacity }}<br>
-            <strong>Дни занятий:</strong> {{ class_.days_of_week or 'Не указано' }}<br>
-            {% if extended %}
-                <strong>Записались:</strong> {{ class_.enrolled_count }}<br>
-            {% endif %}
-        </p>
-
+{% if class_.image_filename %}
+    <!--
+    Если у класса есть загруженное изображение, показываем его.
+    -->
+    <img src="{{ url_for('static', filename='images/' + class_.image_filename) }}" class="card-img-top" alt="{{ class_.name }}">
+{% else %}
+    <!--
+    Если `image_filename` нет (None или пустое),
+    отображаем изображение по умолчанию: default.png.
+    Убедитесь, что default.png лежит в app/static/images/
+    -->
+    <img src="{{ url_for('static', filename='images/default.png') }}" class="card-img-top" alt="Нет изображения">
+{% endif %}
+<div class="card-body">
+    <h5 class="card-title">{{ class_.name }}</h5>
+    <p class="card-text">
+        <strong>Описание:</strong> {{ class_.description or 'Нет описания' }}<br>
+        <strong>Расписание:</strong> {{ class_.schedule.strftime('%Y-%m-%d %H:%M') }}<br>
+        <strong>Вместимость:</strong> {{ class_.capacity }}<br>
+        <strong>Дни занятий:</strong> {{ class_.days_of_week or 'Не указано' }}<br>
         {% if extended %}
-            <button class="btn btn-info btn-sm toggle-details" data-target="#details-{{ class_.id }}">Подробнее</button>
-            <div id="details-{{ class_.id }}" class="mt-3 d-none">
-                <!-- Дополнительная информация для админов -->
-                <p><strong>Дополнительные сведения:</strong> {{ class_.extra_info or 'Нет данных' }}</p>
-                <hr>
-                <h6>Список Записавшихся Пользователей:</h6>
-                {% set bookings = class_.bookings %}
-                {% if bookings %}
-                    <ul>
-                        {% for booking in bookings %}
-                            <li>{{ booking.user.username }} ({{ booking.day }})</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>Нет записавшихся пользователей.</p>
-                {% endif %}
-            </div>
+            <strong>Записались:</strong> {{ class_.enrolled_count }}<br>
         {% endif %}
-    </div>
-
-    <div class="card-footer d-flex justify-content-between">
-        {% if extended %}
-            <!-- Кнопки редактирования и удаления для админов -->
-            <a href="{{ url_for('admin.edit_class', class_id=class_.id) }}" class="btn btn-primary btn-sm">Редактировать</a>
-            <form action="{{ url_for('admin.delete_class', class_id=class_.id) }}" method="POST" style="display:inline;">
-                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Вы уверены, что хотите удалить этот класс?');">Удалить</button>
+    </p>
+    {% if extended %}
+        <button class="btn btn-info btn-sm toggle-details" data-target="#details-{{ class_.id }}">Подробнее</button>
+        <div id="details-{{ class_.id }}" class="mt-3 d-none">
+            <!-- Дополнительная информация для админов -->
+            <p><strong>Дополнительные сведения:</strong> {{ class_.extra_info or 'Нет данных' }}</p>
+            <hr>
+            <h6>Список Записавшихся Пользователей:</h6>
+            {% set bookings = class_.bookings %}
+            {% if bookings %}
+                <ul>
+                    {% for booking in bookings %}
+                        <li>{{ booking.user.username }} ({{ booking.day }})</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>Нет записавшихся пользователей.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+<div class="card-footer d-flex justify-content-between">
+    {% if extended %}
+        <!-- Кнопки редактирования и удаления для админов -->
+        <a href="{{ url_for('admin.edit_class', class_id=class_.id) }}" class="btn btn-primary btn-sm">Редактировать</a>
+        <form action="{{ url_for('admin.delete_class', class_id=class_.id) }}" method="POST" style="display:inline;">
+            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Вы уверены, что хотите удалить этот класс?');">Удалить</button>
+        </form>
+    {% else %}
+        <!-- Кнопка бронирования для обычных пользователей -->
+        {% if class_.available_slots() > 0 %}
+            <form action="{{ url_for('main.book_class', class_id=class_.id) }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-success btn-sm">Забронировать</button>
             </form>
         {% else %}
-            <!-- Кнопка бронирования для обычных пользователей -->
-            {% if class_.available_slots() > 0 %}
-                <a href="{{ url_for('main.book_class', class_id=class_.id) }}" class="btn btn-success btn-sm">Забронировать</a>
-            {% else %}
-                <span class="text-danger">Заполнено</span>
-            {% endif %}
+            <span class="text-danger">Заполнено</span>
         {% endif %}
-    </div>
+    {% endif %}
 </div>

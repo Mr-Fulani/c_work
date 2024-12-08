@@ -1,10 +1,22 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+<!-- app/templates/_macros.html -->
+
+{% macro render_field(field, field_id=None) %}
+    <div class="form-group">
+        {{ field.label(class="form-control-label") }}
+        {% if field.type == 'FileField' %}
+            <!-- Для поля загрузки файла используем кастомный HTML -->
+            {{ field(class="form-control-file", id=field_id) }}
+        {% elif field.type == 'SelectMultipleField' %}
+            <!-- Для SelectMultipleField добавляем id для Choices.js -->
+            {{ field(class="form-control", id=field_id) }}
+        {% else %}
+            {{ field(class="form-control", id=field_id) }}
+        {% endif %}
+        {% for error in field.errors %}
+            <span class="text-danger">{{ error }}</span>
+        {% endfor %}
+        {% if field.description %}
+            <small class="form-text text-muted">{{ field.description }}</small>
+        {% endif %}
+    </div>
+{% endmacro %}

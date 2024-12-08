@@ -1,0 +1,99 @@
+<!-- app/templates/action_logs.html -->
+{% extends "base.html" %}
+
+{% block title %}Логи Действий - c_work{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Логи Действий</h2>
+    <table class="table table-bordered table-hover mt-3">
+        <thead class="thead-light">
+            <tr>
+                <th>Аватар</th>
+                <th>Пользователь</th>
+                <th>Действие</th>
+                <th>IP Адрес</th>
+                <th>Статус</th>
+                <th>Время</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>
+                    {% if log.user.avatar %}
+                        <img src="{{ url_for('static', filename='images/' + log.user.avatar) }}" alt="Аватар" class="rounded-circle" width="50" height="50">
+                    {% else %}
+                        <img src="{{ url_for('static', filename='images/user.png') }}" alt="Аватар" class="rounded-circle" width="50" height="50">
+                    {% endif %}
+                </td>
+                <td>{{ log.user.username }}</td>
+                <td>{{ log.action }}</td>
+                <td>{{ log.ip_address }}</td>
+                <td>
+                    {% if log.status == 'success' %}
+                        <span class="badge badge-success">Успешно</span>
+                    {% else %}
+                        <span class="badge badge-danger">Ошибка</span>
+                    {% endif %}
+                </td>
+                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Пагинация -->
+    {% if pagination.pages > 1 %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            {% if pagination.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.action_logs', page=pagination.prev_num) }}" aria-label="Предыдущая">
+                        <span aria-hidden="true">&laquo;</span>
+                        <span class="sr-only">Предыдущая</span>
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link" aria-label="Предыдущая">
+                        <span aria-hidden="true">&laquo;</span>
+                        <span class="sr-only">Предыдущая</span>
+                    </span>
+                </li>
+            {% endif %}
+
+            {% for page_num in pagination.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    {% if page_num == pagination.page %}
+                        <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                    {% else %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('admin.action_logs', page=page_num) }}">{{ page_num }}</a></li>
+                    {% endif %}
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if pagination.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.action_logs', page=pagination.next_num) }}" aria-label="Следующая">
+                        <span aria-hidden="true">&raquo;</span>
+                        <span class="sr-only">Следующая</span>
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link" aria-label="Следующая">
+                        <span aria-hidden="true">&raquo;</span>
+                        <span class="sr-only">Следующая</span>
+                    </span>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    <a href="{{ url_for('admin.admin_panel') }}" class="btn btn-secondary mt-3">Назад к Панели Администратора</a>
+</div>
+{% endblock %}

@@ -1,36 +1,95 @@
 <!-- app/templates/add_class.html -->
 
 {% extends "base.html" %}
+{% block title %}Добавить Класс{% endblock %}
 
-{% block title %}Добавить Класс - c_work{% endblock %}
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+
+    <!-- Подключаем наш файл стилей для кнопки загрузки -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom_upload.css') }}">
+{% endblock %}
 
 {% block content %}
-    <h2 class="mt-5 mb-4 text-center">Добавить Новый Класс</h2>
-    <form method="POST">
-        <div class="form-group">
-            <label for="name">Название Класса</label>
-            <input type="text" class="form-control" id="name" name="name" required>
+{% from "_macros.html" import render_field %}
+
+<div class="container mt-5">
+    <h2>Добавить Новый Класс</h2>
+    <form method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+
+        {{ render_field(form.name) }}
+        {{ render_field(form.description) }}
+        {{ render_field(form.schedule, field_id="schedule_input") }}
+        {{ render_field(form.capacity) }}
+        {{ render_field(form.days_of_week, field_id="days_of_week_select") }}
+        {{ render_field(form.extra_info) }}
+
+        <!-- Поле для загрузки изображения -->
+        <div class="form-group custom-file-upload">
+            <label for="image_input" class="upload-label">Выбрать изображение</label>
+            {{ form.image(id="image_input") }}
+            <span id="file-chosen">Файл не выбран</span>
+            {% for error in form.image.errors %}
+                <span class="text-danger">{{ error }}</span>
+            {% endfor %}
+            <small class="form-text text-muted">Загрузите изображение для класса (необязательно).</small>
         </div>
-        <div class="form-group">
-            <label for="description">Описание</label>
-            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
-        </div>
-        <div class="form-group">
-            <label for="schedule">Расписание (YYYY-MM-DD HH:MM)</label>
-            <input type="text" class="form-control" id="schedule" name="schedule" placeholder="2024-12-31 18:00" required>
-        </div>
-        <div class="form-group">
-            <label for="capacity">Вместимость</label>
-            <input type="number" class="form-control" id="capacity" name="capacity" value="10" min="1" required>
-        </div>
-        <div class="form-group">
-            <label for="days_of_week">Дни Недели</label>
-            <input type="text" class="form-control" id="days_of_week" name="days_of_week" placeholder="Пн, Ср, Пт">
-        </div>
-        <div class="form-group">
-            <label for="extra_info">Дополнительная Информация</label>
-            <textarea class="form-control" id="extra_info" name="extra_info" rows="3"></textarea>
-        </div>
-        <button type="submit" class="btn btn-success">Добавить Класс</button>
+
+        {{ form.submit(class="btn btn-primary") }}
     </form>
+</div>
 {% endblock %}
+
+{% block scripts %}
+    {{ super() }}
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+
+    <script>
+    /**
+     * Инициализация Flatpickr для поля #schedule_input.
+     */
+    document.addEventListener('DOMContentLoaded', function () {
+        flatpickr("#schedule_input", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+            altInput: true,
+            altFormat: "F j, Y H:i",
+            time_24hr: true
+        });
+    });
+
+    /**
+     * Инициализация Choices.js для поля #days_of_week_select.
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+        new Choices('#days_of_week_select', {
+            removeItemButton: true,
+            searchPlaceholderValue: 'Начните вводить день недели...'
+        });
+    });
+
+    /**
+     * Обработка выбора файла для поля image_input.
+     * При выборе файла отобразим его имя в #file-chosen.
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+        const imageInput = document.getElementById('image_input');
+        const fileChosen = document.getElementById('file-chosen');
+
+        if (imageInput && fileChosen) {
+            imageInput.addEventListener('change', function() {
+                if (imageInput.files && imageInput.files.length > 0) {
+                    fileChosen.textContent = imageInput.files[0].name;
+                } else {
+                    fileChosen.textContent = 'Файл не выбран';
+                }
+            });
+        }
+    });
+    </script>
+{% endblock scripts %}

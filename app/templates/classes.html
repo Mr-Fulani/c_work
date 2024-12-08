@@ -1,18 +1,33 @@
 <!-- app/templates/classes.html -->
-
 {% extends "base.html" %}
-
 {% block title %}Классы - c_work{% endblock %}
 
 {% block content %}
-    <h2 class="mt-5">Доступные Классы</h2>
-    <div class="row mt-3">
-        {% for class in classes %}
-        <div class="col-md-4 mb-4">
-            {% set extended = False %}
-            {% set class_ = class %}
-            {% include 'partials/class_card.html' %}
+<h2 class="mt-5">Доступные Классы</h2>
+<div class="row mt-3">
+    {% for class in classes %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            {% if class.image_filename %}
+                <img src="{{ url_for('static', filename='images/' + class.image_filename) }}" class="card-img-top" alt="{{ class.name }}">
+            {% else %}
+                <img src="{{ url_for('static', filename='images/default.png') }}" class="card-img-top" alt="Нет изображения">
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title">{{ class.name }}</h5>
+                <p><strong>Описание:</strong> {{ class.description }}</p>
+                <p><strong>Расписание:</strong> {{ class.schedule.strftime('%Y-%m-%d %H:%M') }}</p>
+                <p><strong>Вместимость:</strong> {{ class.capacity }}</p>
+                <p><strong>Доступно мест:</strong> {{ class.available_slots() }}</p>
+                <p><strong>Дни недели:</strong> {{ class.days_of_week }}</p>
+                {% if class.available_slots() > 0 %}
+                    <a href="{{ url_for('main.book_class', class_id=class.id) }}" class="btn btn-primary">Забронировать</a>
+                {% else %}
+                    <button class="btn btn-secondary" disabled>Мест нет</button>
+                {% endif %}
+            </div>
         </div>
-        {% endfor %}
     </div>
+    {% endfor %}
+</div>
 {% endblock %}

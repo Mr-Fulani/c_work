@@ -1,0 +1,29 @@
+<!-- app/templates/add_booking.html -->
+{% extends "base.html" %}
+
+{% block title %}Добавить Бронирование - Админ Панель - c_work{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Добавить Бронирование для Пользователя: {{ user.username }}</h2>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="form-group">
+            {{ form.class_id.label(class="form-control-label") }}
+            {{ form.class_id(class="form-control") }}
+            {% for error in form.class_id.errors %}
+                <small class="form-text text-danger">{{ error }}</small>
+            {% endfor %}
+        </div>
+        <div class="form-group">
+            {{ form.day.label(class="form-control-label") }}
+            {{ form.day(class="form-control") }}
+            {% for error in form.day.errors %}
+                <small class="form-text text-danger">{{ error }}</small>
+            {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+        <a href="{{ url_for('admin.admin_panel') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,106 @@
+<!-- app/templates/statistics.html -->
+{% extends "base.html" %}
+
+{% block title %}Статистика - Админ Панель - c_work{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Статистика</h2>
+
+    <h3 class="mt-4">Популярные Классы</h3>
+    <table class="table table-bordered table-hover mt-3">
+        <thead class="thead-light">
+            <tr>
+                <th>Класс</th>
+                <th>Количество Бронирований</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for class, count in popular_classes %}
+            <tr>
+                <td>{{ class }}</td>
+                <td>{{ count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 class="mt-5">Активные Пользователи</h3>
+    <table class="table table-bordered table-hover mt-3">
+        <thead class="thead-light">
+            <tr>
+                <th>Пользователь</th>
+                <th>Количество Бронирований</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user, count in active_users %}
+            <tr>
+                <td>{{ user }}</td>
+                <td>{{ count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 class="mt-5">Неактивные Пользователи (более 30 дней)</h3>
+    {% if inactive_users %}
+        <table class="table table-bordered table-hover mt-3">
+            <thead class="thead-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Имя пользователя</th>
+                    <th>Email</th>
+                    <th>Последний вход</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in inactive_users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Никогда' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Нет неактивных пользователей.</p>
+    {% endif %}
+
+    <h3 class="mt-5">Бронирования по Часам</h3>
+    <table class="table table-bordered table-hover mt-3">
+        <thead class="thead-light">
+            <tr>
+                <th>Час</th>
+                <th>Количество Бронирований</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for hour, count in bookings_by_hour %}
+            <tr>
+                <td>{{ hour }}:00</td>
+                <td>{{ count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 class="mt-5">Статистика Платежей</h3>
+    <table class="table table-bordered table-hover mt-3">
+        <thead class="thead-light">
+            <tr>
+                <th>Успешные Платежи</th>
+                <th>Неуспешные Платежи</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ successful_payments }}</td>
+                <td>{{ failed_payments }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

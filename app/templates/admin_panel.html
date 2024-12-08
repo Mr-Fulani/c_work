@@ -1,69 +1,127 @@
 <!-- app/templates/admin_panel.html -->
 {% extends "base.html" %}
 
-{% block title %}Панель Администратора - c_work{% endblock %}
+{% block title %}Админ Панель - c_work{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
-    <h2 class="mt-5 mb-4 text-center">Панель Администратора</h2>
+    <h2>Административная Панель</h2>
 
-    <!-- Управление Классами -->
-    <h3 class="mt-4 mb-3 text-center">Классы</h3>
-    <div class="text-center mb-4">
-        <a href="{{ url_for('admin.add_class') }}" class="btn btn-success">Добавить Класс</a>
-    </div>
-
-    <div class="row">
-        {% for class in classes %}
-        <div class="col-md-4 mb-4">
-            {% set extended = True %}
-            {% set class_ = class %}
-            {% include 'partials/class_card.html' %}
-        </div>
-        {% endfor %}
-    </div>
-
-    <!-- Управление Пользователями -->
-    <h3 class="mt-5 mb-3 text-center">Пользователи</h3>
-    <div class="row">
-        {% for user in users %}
-        <div class="col-md-4 mb-4">
-            <div class="card h-100 shadow-sm">
-                <img src="{{ url_for('static', filename='images/user.png') }}" class="card-img-top" alt="User Image">
-                <div class="card-body">
-                    <h5 class="card-title">{{ user.username }}</h5>
-                    <p class="card-text">
-                        <strong>Email:</strong> {{ user.email }}<br>
-                        <strong>Администратор:</strong> {{ 'Да' if user.is_admin else 'Нет' }}
-                    </p>
-                    <button class="btn btn-info btn-sm toggle-details" data-target="#user-details-{{ user.id }}">Подробнее</button>
-                    <div id="user-details-{{ user.id }}" class="mt-3 d-none">
-                        <!-- Дополнительная информация о пользователе -->
-                        <p><strong>ID:</strong> {{ user.id }}</p>
-                        <p><strong>Количество бронирований:</strong> {{ user.bookings|length }}</p>
-                        <!-- Добавьте больше информации при необходимости -->
-                    </div>
-                </div>
-                <div class="card-footer d-flex justify-content-between">
+    <h3 class="mt-4">Пользователи</h3>
+    <table class="table table-bordered table-hover mt-3">
+        <thead class="thead-light">
+            <tr>
+                <th>Аватар</th>
+                <th>ID</th>
+                <th>Имя пользователя</th>
+                <th>Email</th>
+                <th>Дата регистрации</th>
+                <th>Последний вход</th>
+                <th>Администратор</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>
+                    <img src="{{ url_for('static', filename='images/' + (user.avatar or 'user.png')) }}" alt="Аватар" class="rounded-circle" width="50" height="50">
+                </td>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.email }}</td>
+                <td>{{ user.date_registered.strftime('%Y-%m-%d %H:%M') if user.date_registered else 'Неизвестно' }}</td>
+                <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Неизвестно' }}</td>
+                <td>{{ 'Да' if user.is_admin else 'Нет' }}</td>
+                <td>
                     {% if not user.is_admin %}
                         <form action="{{ url_for('admin.promote_user', user_id=user.id) }}" method="POST" style="display:inline;">
-                            <button type="submit" class="btn btn-success btn-sm">Назначить Админом</button>
+                            {{ promote_user_forms[user.id].hidden_tag() }}
+                            {{ promote_user_forms[user.id].user_id(value=user.id) }}
+                            {{ promote_user_forms[user.id].submit(class="btn btn-success btn-sm", value="Назначить админом") }}
                         </form>
                     {% else %}
-                        {% if user.id != current_user.id %}
-                            <form action="{{ url_for('admin.demote_user', user_id=user.id) }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-warning btn-sm">Понизить из Админов</button>
-                            </form>
-                        {% endif %}
+                        <form action="{{ url_for('admin.demote_user', user_id=user.id) }}" method="POST" style="display:inline;">
+                            {{ demote_user_forms[user.id].hidden_tag() }}
+                            {{ demote_user_forms[user.id].user_id(value=user.id) }}
+                            {{ demote_user_forms[user.id].submit(class="btn btn-warning btn-sm", value="Отстранить") }}
+                        </form>
                     {% endif %}
 
-                    <form action="{{ url_for('admin.delete_user', user_id=user.id) }}" method="POST" style="display:inline;">
-                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Вы уверены, что хотите удалить этого пользователя?');">Удалить</button>
+                    {% if user.id != current_user.id %}
+                        <form action="{{ url_for('admin.delete_user', user_id=user.id) }}" method="POST" style="display:inline;">
+                            {{ delete_user_forms[user.id].hidden_tag() }}
+                            {{ delete_user_forms[user.id].user_id(value=user.id) }}
+                            {{ delete_user_forms[user.id].submit(class="btn btn-danger btn-sm", onclick="return confirm('Вы уверены, что хотите удалить этого пользователя?');") }}
+                        </form>
+                    {% endif %}
+
+                    <a href="{{ url_for('admin.add_booking', user_id=user.id) }}" class="btn btn-info btn-sm">Добавить Бронирование</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 class="mt-5">Классы</h3>
+    <table class="table table-bordered table-hover mt-3">
+        <thead class="thead-light">
+            <tr>
+                <th>ID</th>
+                <th>Название</th>
+                <th>Описание</th>
+                <th>Расписание</th>
+                <th>Вместимость</th>
+                <th>Доступные Места</th> <!-- Новая колонка -->
+                <th>Дни недели</th>
+                <th>Доп. информация</th>
+                <th>Изображение</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for class_ in classes %}
+            <tr>
+                <td>{{ class_.id }}</td>
+                <td>{{ class_.name }}</td>
+                <td>{{ class_.description }}</td>
+                <td>{{ class_.schedule.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ class_.capacity }}</td>
+                <td>
+                    {% if available_spots[class_.id] > 0 %}
+                    {{ available_spots[class_.id] }}
+                    {% elif available_spots[class_.id] == 0 %}
+                    <span class="text-danger">Нет мест</span>
+                    {% else %}
+                    <span class="text-warning">Переполнено</span>
+                    {% endif %}
+                </td>
+                <td>{{ class_.days_of_week }}</td>
+                <td>{{ class_.extra_info }}</td>
+                <td>
+                    {% if class_.image_filename %}
+                        <img src="{{ url_for('static', filename='images/' + class_.image_filename) }}" alt="Изображение" width="50" height="50">
+                    {% else %}
+                        Нет изображения
+                    {% endif %}
+                </td>
+                <td>
+                    <!-- Кнопка "Редактировать" -->
+                    <a href="{{ url_for('admin.edit_class', class_id=class_.id) }}" class="btn btn-primary btn-sm">Редактировать</a>
+
+                    <!-- Форма для удаления класса -->
+                    <form action="{{ url_for('admin.delete_class', class_id=class_.id) }}" method="POST" style="display:inline;">
+                        {{ delete_class_forms[class_.id].hidden_tag() }}
+                        {{ delete_class_forms[class_.id].class_id(value=class_.id) }}
+                        {{ delete_class_forms[class_.id].submit(class="btn btn-danger btn-sm", onclick="return confirm('Вы уверены, что хотите удалить этот класс?');") }}
                     </form>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 class="mt-5">Логи Действий</h3>
+    <a href="{{ url_for('admin.action_logs') }}" class="btn btn-info">Просмотреть Логи</a>
 </div>
 {% endblock %}
