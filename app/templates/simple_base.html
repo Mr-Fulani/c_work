@@ -1,0 +1,35 @@
+<!-- app/templates/simple_base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}c_work{% endblock %}</title>
+    <!-- Include specific styles for pages without header and footer -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    {% block extra_head %}{% endblock %}
+    <style>
+        /* Ensure the body takes the full height of the viewport */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #151f28; /* Customize as needed */
+        }
+        /* Center content vertically and horizontally */
+        .centered-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="centered-container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Include scripts if necessary -->
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,13 @@
+<!-- app/templates/error_invalid_token.html -->
+{% extends "base.html" %}
+
+{% block title %}Некорректная Ссылка - c_work{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+        <div class="alert alert-warning" role="alert">
+            Срок действия ссылки истёк или она некорректна.
+        </div>
+        <a href="{{ url_for('main.reset_password') }}" class="btn btn-primary">Запросить Новую Ссылку</a>
+    </div>
+{% endblock %}

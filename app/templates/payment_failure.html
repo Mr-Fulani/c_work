@@ -1,0 +1,12 @@
+<!-- app/templates/payment_failure.html -->
+{% extends "base.html" %}
+
+{% block title %}Платёж Не Успешен - c_work{% endblock %}
+
+{% block content %}
+<div class="container mt-5 text-center">
+    <h2>Платёж Не Успешен</h2>
+    <p>Произошла ошибка при обработке вашего платежа. Пожалуйста, попробуйте снова.</p>
+    <a href="{{ url_for('main.process_payment') }}" class="btn btn-secondary">Попробовать Снова</a>
+</div>
+{% endblock %}

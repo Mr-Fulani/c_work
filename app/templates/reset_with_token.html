@@ -1,0 +1,30 @@
+<!-- app/templates/reset_with_token.html -->
+{% extends "base.html" %}
+
+{% block title %}Сброс Пароля - c_work{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+        <h2>Сброс Пароля</h2>
+        <form method="POST">
+            {{ form.hidden_tag() }}
+            <div class="form-group">
+                {{ form.password.label(class="form-label") }}
+                {{ form.password(class="form-control", placeholder="Новый Пароль") }}
+                {% for error in form.password.errors %}
+                    <small class="form-text text-danger">{{ error }}</small>
+                {% endfor %}
+            </div>
+            <div class="form-group">
+                {{ form.confirm_password.label(class="form-label") }}
+                {{ form.confirm_password(class="form-control", placeholder="Подтвердите Пароль") }}
+                {% for error in form.confirm_password.errors %}
+                    <small class="form-text text-danger">{{ error }}</small>
+                {% endfor %}
+            </div>
+            <div class="form-group">
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+{% endblock %}

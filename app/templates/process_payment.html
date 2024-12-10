@@ -1,0 +1,72 @@
+<!-- app/templates/process_payment.html -->
+{% extends "base.html" %}
+
+{% block title %}Оплата - c_work{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Оплатить</h2>
+    {% if form and not client_secret %}
+        <form method="POST">
+            {{ form.hidden_tag() }}
+            <div class="form-group">
+                {{ form.amount.label(class="form-label") }}
+                {{ form.amount(class="form-control", placeholder="Введите сумму в USD") }}
+                {% for error in form.amount.errors %}
+                    <small class="form-text text-danger">{{ error }}</small>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary">Продолжить</button>
+        </form>
+    {% elif client_secret %}
+        <form id="payment-form">
+            <div class="form-group">
+                <label for="card-element">Кредитная или дебетовая карта</label>
+                <div id="card-element">
+                    <!-- Stripe.js вставит здесь элемент карты -->
+                </div>
+                <!-- Элемент для отображения ошибок -->
+                <div id="card-errors" role="alert"></div>
+            </div>
+            <button id="submit" class="btn btn-primary">Оплатить</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://js.stripe.com/v3/"></script>
+{% if client_secret %}
+<script>
+    const stripe = Stripe('{{ stripe_publishable_key }}');
+    const elements = stripe.elements();
+    const cardElement = elements.create('card');
+    cardElement.mount('#card-element');
+
+    const form = document.getElementById('payment-form');
+    const submitButton = document.getElementById('submit');
+    const cardErrors = document.getElementById('card-errors');
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        submitButton.disabled = true;
+
+        const {error, paymentIntent} = await stripe.confirmCardPayment('{{ client_secret }}', {
+            payment_method: {
+                card: cardElement,
+                billing_details: {
+                    name: '{{ current_user.username }}'
+                }
+            }
+        });
+
+        if (error) {
+            cardErrors.textContent = error.message;
+            submitButton.disabled = false;
+        } else if (paymentIntent.status === 'succeeded') {
+            window.location.href = "{{ url_for('main.payment_success') }}";
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

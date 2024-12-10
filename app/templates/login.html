@@ -1,21 +1,45 @@
 <!-- app/templates/login.html -->
+{% extends "simple_base.html" %}
 
-{% extends "base.html" %}
-
-{% block title %}Вход - c_work{% endblock %}
+{% block title %}Sign In - c_work{% endblock %}
 
 {% block content %}
-    <h2 class="mt-5">Вход</h2>
-    <form method="POST" class="mt-3">
-        <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" name="email" class="form-control" id="email" required>
+    <div class="square">
+        <i style="--clr:#00ff0a;"></i>
+        <i style="--clr:#ff0057;"></i>
+        <i style="--clr:#fffd44;"></i>
+        <div class="login">
+            <h2>Sign In</h2>
+            <form method="POST">
+                {{ form.hidden_tag() }}
+
+                <!-- Email or Username Field -->
+                <div class="inputBx">
+                    {{ form.email_or_username(class="form-control", placeholder="Email or Username") }}
+                    {% for error in form.email_or_username.errors %}
+                        <small class="form-text text-danger">{{ error }}</small>
+                    {% endfor %}
+                </div>
+
+                <!-- Password Field -->
+                <div class="inputBx">
+                    {{ form.password(class="form-control", placeholder="Password") }}
+                    {% for error in form.password.errors %}
+                        <small class="form-text text-danger">{{ error }}</small>
+                    {% endfor %}
+                </div>
+
+                <!-- Submit Button -->
+                <div class="inputBx">
+                    {{ form.submit(class="btn btn-primary", value="Sign In") }}
+                </div>
+
+                <!-- Links -->
+                <div class="links">
+                    <a href="{{ url_for('main.reset_password') }}">Forgot Password?</a>
+                    <a href="{{ url_for('main.register') }}">Sign Up</a>
+                </div>
+            </form>
         </div>
-        <div class="form-group">
-            <label for="password">Пароль</label>
-            <input type="password" name="password" class="form-control" id="password" required>
-        </div>
-        <button type="submit" class="btn btn-primary">Войти</button>
-    </form>
-    <p class="mt-3">Нет аккаунта? <a href="{{ url_for('main.register') }}">Зарегистрируйтесь здесь</a>.</p>
+    </div>
 {% endblock %}

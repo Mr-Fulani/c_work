@@ -1,0 +1,16 @@
+<!-- app/templates/emails/booking_confirmation.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Подтверждение Бронирования</title>
+</head>
+<body>
+    <p>Здравствуйте, {{ user.username }}!</p>
+    <p>Вы успешно забронировали место на классе "<strong>{{ class_.name }}</strong>".</p>
+    <p>День недели: {{ selected_day }}</p>
+    <p>Дата и время: {{ class_.schedule.strftime("%d.%m.%Y %H:%M") }}</p>
+    <p>Спасибо за использование сервиса c_work!</p>
+    <p>С уважением,<br>Команда c_work</p>
+</body>
+</html>

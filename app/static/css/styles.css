@@ -5,3 +5,61 @@
     height: 200px;
     object-fit: cover;
 }
+
+/* app/static/css/styles.css */
+
+/* Центрирование и максимальная ширина для Flash сообщений */
+.alert {
+    max-width: 500px;
+    margin: 0 auto 15px auto;
+    border-radius: 8px;
+    padding: 15px 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Анимация появления сообщений */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.alert {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+/* Изменение цвета кнопки закрытия для лучшей видимости */
+.alert .close {
+    color: inherit;
+    opacity: 0.7;
+}
+
+.alert .close:hover {
+    opacity: 1;
+}
+
+/* Дополнительные стили для разных категорий сообщений */
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}

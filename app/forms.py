@@ -2,15 +2,22 @@
 from flask_login import current_user
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from wtforms import StringField, PasswordField, SubmitField, widgets
+from password_validator import PasswordValidator
+from wtforms import StringField, PasswordField, SubmitField, BooleanField
+from wtforms import widgets
 from wtforms.fields.choices import SelectMultipleField, SelectField
 from wtforms.fields.datetime import DateTimeField
-from wtforms.fields.numeric import IntegerField
+from wtforms.fields.numeric import IntegerField, DecimalField
 from wtforms.fields.simple import TextAreaField, HiddenField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError, NumberRange
-from app.models import User, Class
-from password_validator import PasswordValidator
 
+from app.models import User, Class
+
+
+class LoginForm(FlaskForm):
+    email_or_username = StringField('Email or Username', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    submit = SubmitField('Sign In')
 
 class RegistrationForm(FlaskForm):
     username = StringField('Имя пользователя', validators=[
@@ -205,3 +212,41 @@ class ChangePasswordForm(FlaskForm):
         EqualTo('new_password', message='Пароли должны совпадать.')
     ])
     submit = SubmitField('Изменить Пароль')
+
+
+
+
+
+
+
+class ResetPasswordRequestForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired(), Email(message='Неверный формат email.')])
+    submit = SubmitField('Отправить ссылку для сброса пароля')
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField('Новый Пароль', validators=[
+        DataRequired(),
+        Length(min=8, message='Пароль должен быть не менее 8 символов.')
+    ])
+    confirm_password = PasswordField('Подтвердите Пароль', validators=[
+        DataRequired(),
+        EqualTo('password', message='Пароли должны совпадать.')
+    ])
+    submit = SubmitField('Сбросить Пароль')
+
+
+
+
+
+
+
+class PaymentForm(FlaskForm):
+    amount = DecimalField(
+        'Сумма (USD)',
+        validators=[
+            DataRequired(),
+            NumberRange(min=1, message='Минимальная сумма: 1$')
+        ],
+        places=2
+    )
+    submit = SubmitField('Оплатить')

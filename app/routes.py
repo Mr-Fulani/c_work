@@ -1,28 +1,54 @@
 # app/routes.py
 import logging
 import os
+import re
 import uuid
 from datetime import datetime, timedelta
 
 import stripe
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
-from flask_wtf import FlaskForm
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_login import login_user, current_user, logout_user, login_required
+from flask_wtf import CSRFProtect
 from werkzeug.utils import secure_filename
-from wtforms.fields.choices import SelectField
-from wtforms.fields.simple import SubmitField
-from wtforms.validators import DataRequired
 
 from app import db, bcrypt, limiter
-from app.models import User, Class, Booking, Payment, ActionLog
 from app.forms import RegistrationForm, BookingForm, CancelBookingForm, UpdateProfileForm, SelectDayForm, \
-    ChangePasswordForm
-from flask_login import login_user, current_user, logout_user, login_required
-
+    ChangePasswordForm, LoginForm, ResetPasswordForm, ResetPasswordRequestForm, PaymentForm
+from app.models import User, Class, Booking, ActionLog, Payment
 from app.utils import allowed_file
+
+
+
+
+from itsdangerous import URLSafeTimedSerializer
+from flask_mail import Message
+from app import mail  # Убедитесь, что Flask-Mail инициализирован
+
+
+
+
+
+
+
 
 main_bp = Blueprint('main', __name__)
 
 logger = logging.getLogger(__name__)
+
+
+# Инициализация Flask-Limiter
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+
+
+MAX_FAILED_ATTEMPTS = 5
+BLOCK_DURATION = timedelta(minutes=15)
+
 
 
 
@@ -83,65 +109,253 @@ def register():
 
 
 
-
-MAX_FAILED_ATTEMPTS = 5
-BLOCK_DURATION = timedelta(minutes=15)
-
-
-
 @main_bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("10 per minute", methods=["POST"], error_message="Слишком много попыток входа. Попробуйте позже.")
+@limiter.limit("10 per minute", methods=["POST"], error_message="Too many login attempts. Please try again later.")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('main.home'))
-    if request.method == 'POST':
-        email = request.form.get('email').strip().lower()
-        password = request.form.get('password')
-        user = User.query.filter_by(email=email).first()
 
-        # Получение количества неудачных попыток за последние 15 минут
-        recent_failed_logins = ActionLog.query.filter(
-            ActionLog.user_id == user.id if user else False,
-            ActionLog.action == 'Вход',
-            ActionLog.status == 'failure',
-            ActionLog.timestamp >= datetime.utcnow() - BLOCK_DURATION
-        ).count()
+    form = LoginForm()
+    if form.validate_on_submit():
+        identifier = form.email_or_username.data.strip()
+        password = form.password.data
 
-        if recent_failed_logins >= MAX_FAILED_ATTEMPTS:
-            flash('Слишком много неудачных попыток входа. Попробуйте позже.', 'danger')
-            return render_template('login.html')
-
-        if user and bcrypt.check_password_hash(user.password, password):
-            login_user(user)
-            user.last_login = datetime.utcnow()
-            db.session.commit()
-
-            # Логирование успешного входа
-            action = ActionLog(
-                user_id=user.id,
-                action='Вход',
-                ip_address=request.remote_addr,
-                status='success'
-            )
-            db.session.add(action)
-            db.session.commit()
-
-            next_page = request.args.get('next')
-            flash('Вы вошли в систему!', 'success')
-            return redirect(next_page) if next_page else redirect(url_for('main.home'))
+        # Определяем, является ли идентификатор email с помощью регулярного выражения
+        email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+        if re.match(email_regex, identifier):
+            user = User.query.filter_by(email=identifier.lower()).first()
         else:
-            # Логирование неуспешного входа
+            user = User.query.filter_by(username=identifier).first()
+
+        if user:
+            # Получение количества неудачных попыток входа за последние 15 минут
+            recent_failed_logins = ActionLog.query.filter(
+                ActionLog.user_id == user.id,
+                ActionLog.action == 'Login',
+                ActionLog.status == 'failure',
+                ActionLog.timestamp >= datetime.utcnow() - BLOCK_DURATION
+            ).count()
+
+            if recent_failed_logins >= MAX_FAILED_ATTEMPTS:
+                # Логирование неуспешной попытки входа
+                action = ActionLog(
+                    user_id=user.id,
+                    action='Login',
+                    ip_address=request.remote_addr,
+                    status='failure'
+                )
+                db.session.add(action)
+                db.session.commit()
+
+                return redirect(url_for('main.error_page', error_type='too_many_attempts'))
+
+            if bcrypt.check_password_hash(user.password, password):
+                login_user(user)
+                user.last_login = datetime.utcnow()
+                db.session.commit()
+
+                # Логирование успешного входа
+                action = ActionLog(
+                    user_id=user.id,
+                    action='Login',
+                    ip_address=request.remote_addr,
+                    status='success'
+                )
+                db.session.add(action)
+                db.session.commit()
+
+                return redirect(url_for('main.home'))
+            else:
+                # Логирование неуспешной попытки входа
+                action = ActionLog(
+                    user_id=user.id,
+                    action='Login',
+                    ip_address=request.remote_addr,
+                    status='failure'
+                )
+                db.session.add(action)
+                db.session.commit()
+
+                return redirect(url_for('main.error_page', error_type='invalid_credentials'))
+        else:
+            # Логирование неуспешной попытки входа (пользователь не найден)
             action = ActionLog(
-                user_id=user.id if user else None,
-                action='Вход',
+                user_id=None,
+                action='Login',
                 ip_address=request.remote_addr,
                 status='failure'
             )
             db.session.add(action)
             db.session.commit()
 
-            flash('Неверные данные для входа. Пожалуйста, попробуйте снова.', 'danger')
-    return render_template('login.html')
+            return redirect(url_for('main.error_page', error_type='invalid_credentials'))
+
+    return render_template('login.html', form=form)
+
+
+
+
+@main_bp.route('/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    form = ChangePasswordForm()
+    if form.validate_on_submit():
+        # Проверка количества изменений пароля за последние 24 часа
+        recent_password_changes = ActionLog.query.filter(
+            ActionLog.user_id == current_user.id,
+            ActionLog.action == 'Изменение пароля',
+            ActionLog.timestamp >= datetime.utcnow() - timedelta(hours=24)
+        ).count()
+
+        if recent_password_changes >= 3:
+            flash('Вы превысили лимит изменений пароля за последние 24 часа. Попробуйте позже.', 'danger')
+            return redirect(url_for('main.profile'))
+
+        # Проверка текущего пароля
+        if bcrypt.check_password_hash(current_user.password, form.current_password.data):
+            # Генерация хэшированного нового пароля
+            hashed_password = bcrypt.generate_password_hash(form.new_password.data).decode('utf-8')
+            current_user.password = hashed_password
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Ошибка при обновлении пароля пользователя {current_user.id}: {e}")
+                flash('Произошла ошибка при обновлении пароля. Попробуйте позже.', 'danger')
+                return redirect(url_for('main.change_password'))
+
+            # Логирование успешного изменения пароля
+            action = ActionLog(
+                user_id=current_user.id,
+                action='Изменение пароля',
+                ip_address=request.remote_addr,
+                status='success'
+            )
+            try:
+                db.session.add(action)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Ошибка при логировании изменения пароля пользователя {current_user.id}: {e}")
+                flash('Пароль обновлён, но произошла ошибка при логировании действия.', 'warning')
+
+            flash('Ваш пароль был обновлён!', 'success')
+            return redirect(url_for('main.profile'))
+        else:
+            flash('Текущий пароль неверен.', 'danger')
+            # Логирование неуспешного изменения пароля
+            action = ActionLog(
+                user_id=current_user.id,
+                action='Изменение пароля',
+                ip_address=request.remote_addr,
+                status='failure'
+            )
+            try:
+                db.session.add(action)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Ошибка при логировании неуспешного изменения пароля пользователя {current_user.id}: {e}")
+
+    return render_template('change_password.html', form=form)
+
+
+
+
+
+@main_bp.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.home'))
+
+    form = ResetPasswordRequestForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data.strip().lower()).first()
+        if user:
+            # Инициализация сериализатора внутри функции
+            serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+            token = serializer.dumps(user.email, salt='password-reset-salt')
+            reset_url = url_for('main.reset_with_token', token=token, _external=True)
+
+            # Отправка письма с ссылкой для сброса пароля
+            msg = Message('Сброс Пароля',
+                          sender=current_app.config['MAIL_DEFAULT_SENDER'],
+                          recipients=[user.email])
+            msg.body = f'''Здравствуйте, {user.username}!
+
+Вы получили это письмо, потому что вы (или кто-то другой) запросили сброс пароля для вашего аккаунта.
+
+Пожалуйста, перейдите по следующей ссылке, чтобы сбросить пароль:
+
+{reset_url}
+
+Если вы не запрашивали сброс пароля, пожалуйста, проигнорируйте это письмо.
+
+Спасибо!
+Команда c_work
+'''
+            try:
+                mail.send(msg)
+                flash('Ссылка для сброса пароля отправлена на ваш email.', 'info')
+            except Exception as e:
+                logger.error(f"Ошибка при отправке письма сброса пароля: {e}")
+                flash('Не удалось отправить письмо. Пожалуйста, попробуйте позже.', 'danger')
+        else:
+            flash('Email не найден в системе.', 'danger')
+    return render_template('reset_password.html', form=form)
+
+
+
+
+
+
+
+
+@main_bp.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_with_token(token):
+    try:
+        serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+        email = serializer.loads(token, salt='password-reset-salt', max_age=3600)  # Срок действия токена: 1 час
+    except Exception as e:
+        flash('Срок действия ссылки для сброса пароля истёк или она некорректна.', 'danger')
+        return redirect(url_for('main.error_page', error_type='invalid_token'))
+
+    user = User.query.filter_by(email=email).first_or_404()
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+        user.password = hashed_password
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Ошибка при обновлении пароля пользователя {user.id}: {e}")
+            flash('Произошла ошибка при обновлении пароля. Попробуйте позже.', 'danger')
+            return redirect(url_for('main.error_page', error_type='unknown_error'))
+
+        # Логирование успешного сброса пароля
+        action = ActionLog(
+            user_id=user.id,
+            action='Сброс пароля',
+            ip_address=request.remote_addr,
+            status='success'
+        )
+        try:
+            db.session.add(action)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Ошибка при логировании сброса пароля пользователя {user.id}: {e}")
+            flash('Пароль обновлён, но произошла ошибка при логировании действия.', 'warning')
+
+        flash('Ваш пароль был успешно сброшен. Теперь вы можете войти.', 'success')
+        return redirect(url_for('main.login'))
+    return render_template('reset_with_token.html', form=form)
+
+
+
+
+
 
 
 @main_bp.route('/logout')
@@ -160,6 +374,8 @@ def classes():
     classes = Class.query.order_by(Class.schedule.asc()).all()
     booking_forms = {class_.id: BookingForm(class_id=class_.id) for class_ in classes}
     return render_template('classes.html', classes=classes, booking_forms=booking_forms)
+
+
 
 
 
@@ -222,10 +438,66 @@ def book_class(class_id):
         db.session.add(action)
         db.session.commit()
 
+        # Отправка уведомления пользователю
+        try:
+            user_msg = Message(
+                'Подтверждение Бронирования',
+                recipients=[current_user.email]
+            )
+            user_msg.html = render_template(
+                'emails/booking_confirmation.html',
+                user=current_user,
+                class_=class_,
+                selected_day=selected_day
+            )
+            user_msg.body = f'''Здравствуйте, {current_user.username}!
+
+Вы успешно забронировали место на классе "{class_.name}".
+День недели: {selected_day}
+Дата и время: {class_.schedule.strftime("%d.%m.%Y %H:%M")}
+
+Спасибо за использование сервиса c_work!
+
+С уважением,
+Команда c_work
+'''
+            mail.send(user_msg)
+        except Exception as e:
+            logger.error(f"Ошибка при отправке подтверждения бронирования пользователю {current_user.id}: {e}")
+            flash('Не удалось отправить подтверждение бронирования на ваш email.', 'warning')
+
+        # Отправка уведомления администраторам
+        try:
+            admins = User.query.filter_by(is_admin=True).all()
+            admin_emails = [admin.email for admin in admins]
+            if admin_emails:
+                admin_msg = Message(
+                    'Новая Запись на Класс',
+                    recipients=admin_emails
+                )
+                admin_msg.body = f'''Здравствуйте!
+
+Пользователь {current_user.username} ({current_user.email}) забронировал место на классе "{class_.name}".
+День недели: {selected_day}
+Дата и время: {class_.schedule.strftime("%d.%m.%Y %H:%M")}
+
+Пожалуйста, проверьте статус класса и при необходимости свяжитесь с пользователем.
+
+С уважением,
+Система c_work
+'''
+                mail.send(admin_msg)
+        except Exception as e:
+            logger.error(f"Ошибка при отправке уведомления администраторам: {e}")
+            flash('Не удалось отправить уведомление администраторам.', 'warning')
+
         flash('Класс успешно забронирован!', 'success')
         return redirect(url_for('main.my_bookings'))
 
     return render_template('book_class.html', class_=class_, form=form, available_days=available_days)
+
+
+
 
 
 
@@ -412,188 +684,222 @@ def profile():
 
 
 
-# @main_bp.route('/process_payment', methods=['POST'])
-# @login_required
-# def process_payment():
-#     # Логика обработки платежа
-#     try:
-#         # Предположим, что здесь код для обработки платежа
-#         # Например, взаимодействие с Stripe API
-#
-#         # Если платеж успешен
-#         payment = Payment(
-#             user_id=current_user.id,
-#             amount=amount,  # Определите переменную amount
-#             stripe_payment_id=stripe_payment_id,  # Получите ID платежа от Stripe
-#             status='paid'
-#         )
-#         db.session.add(payment)
-#         db.session.commit()
-#
-#         # Логирование успешного платежа
-#         action = ActionLog(
-#             user_id=current_user.id,
-#             action=f"Успешный платеж на сумму {amount}",
-#             ip_address=request.remote_addr,
-#             status='success'
-#         )
-#         db.session.add(action)
-#         db.session.commit()
-#
-#         flash('Платёж успешно выполнен.', 'success')
-#         return redirect(url_for('main.payment_success'))
-#     except Exception as e:
-#         logger.error(f"Ошибка при обработке платежа: {e}")
-#
-#         # Логирование неуспешного платежа
-#         action = ActionLog(
-#             user_id=current_user.id,
-#             action=f"Неуспешный платеж на сумму {amount}",
-#             ip_address=request.remote_addr,
-#             status='failure'
-#         )
-#         db.session.add(action)
-#         db.session.commit()
-#
-#         flash('Ошибка при выполнении платежа. Пожалуйста, попробуйте снова.', 'danger')
-#         return redirect(url_for('main.payment_failure'))
 
 
 
 
 
-
-
-
-
-@main_bp.route('/change_password', methods=['GET', 'POST'])
+@main_bp.route('/process_payment', methods=['GET', 'POST'])
 @login_required
-def change_password():
-    form = ChangePasswordForm()
+def process_payment():
+    form = PaymentForm()
     if form.validate_on_submit():
-        # Проверка количества изменений пароля за последние 24 часа
-        recent_password_changes = ActionLog.query.filter(
-            ActionLog.user_id == current_user.id,
-            ActionLog.action == 'Изменение пароля',
-            ActionLog.timestamp >= datetime.utcnow() - timedelta(hours=24)
-        ).count()
+        try:
+            amount = int(form.amount.data * 100)  # Stripe принимает сумму в центах
+            stripe.api_key = current_app.config['STRIPE_SECRET_KEY']
 
-        if recent_password_changes >= 3:
-            flash('Вы превысили лимит изменений пароля за последние 24 часа. Попробуйте позже.', 'danger')
-            return redirect(url_for('main.profile'))
-
-        # Проверка текущего пароля
-        if bcrypt.check_password_hash(current_user.password, form.current_password.data):
-            # Генерация хэшированного нового пароля
-            hashed_password = bcrypt.generate_password_hash(form.new_password.data).decode('utf-8')
-            current_user.password = hashed_password
-            try:
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Ошибка при обновлении пароля пользователя {current_user.id}: {e}")
-                flash('Произошла ошибка при обновлении пароля. Попробуйте позже.', 'danger')
-                return redirect(url_for('main.change_password'))
-
-            # Логирование успешного изменения пароля
-            action = ActionLog(
-                user_id=current_user.id,
-                action='Изменение пароля',
-                ip_address=request.remote_addr,
-                status='success'
+            # Создание PaymentIntent
+            intent = stripe.PaymentIntent.create(
+                amount=amount,
+                currency='usd',  # Замените на нужную валюту
+                metadata={'user_id': current_user.id}
             )
-            try:
-                db.session.add(action)
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Ошибка при логировании изменения пароля пользователя {current_user.id}: {e}")
-                flash('Пароль обновлён, но произошла ошибка при логировании действия.', 'warning')
 
-            flash('Ваш пароль был обновлён!', 'success')
-            return redirect(url_for('main.profile'))
-        else:
-            flash('Текущий пароль неверен.', 'danger')
-            # Логирование неуспешного изменения пароля
-            action = ActionLog(
-                user_id=current_user.id,
-                action='Изменение пароля',
-                ip_address=request.remote_addr,
-                status='failure'
+            logger.info(f"Created PaymentIntent: {intent['id']} for user {current_user.id}")
+
+            return render_template(
+                'process_payment.html',
+                client_secret=intent.client_secret,
+                stripe_publishable_key=current_app.config['STRIPE_PUBLISHABLE_KEY']
             )
-            try:
-                db.session.add(action)
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Ошибка при логировании неуспешного изменения пароля пользователя {current_user.id}: {e}")
 
-    return render_template('change_password.html', form=form)
+        except Exception as e:
+            logger.error(f"Ошибка при создании PaymentIntent: {e}")
+            flash('Произошла ошибка при обработке платежа. Пожалуйста, попробуйте снова.', 'danger')
+            return redirect(url_for('main.home'))
 
+    return render_template('process_payment.html', form=form)
 
 
 
 
+
+
+
+
+
+
+@main_bp.route('/payment_success')
+@login_required
+def payment_success():
+    return render_template('payment_success.html')
+
+
+
+@main_bp.route('/payment_failure')
+@login_required
+def payment_failure():
+    return render_template('payment_failure.html')
+
+
+
+# @main_bp.route('/test_webhook', methods=['POST'])
+# def test_webhook():
+#     logger.info("Test webhook received")
+#     return 'Webhook received', 200
+#
+#
+#
+#
+#
+# # Инициализация CSRF и Limiter
+# csrf = CSRFProtect()
+# limiter = Limiter(key_func=get_remote_address)
+#
 # @main_bp.route('/stripe_webhook', methods=['POST'])
+# @limiter.exempt      # Исключаем маршрут из ограничения по скорости
+# @csrf.exempt         # Исключаем маршрут из CSRF-защиты
 # def stripe_webhook():
 #     payload = request.get_data(as_text=True)
 #     sig_header = request.headers.get('Stripe-Signature')
-#     endpoint_secret = 'your_endpoint_secret'
+#     endpoint_secret = current_app.config['STRIPE_ENDPOINT_SECRET']
+#
+#     logging.info("Received webhook payload")
+#     logging.debug(f"Payload: {payload}")
+#     logging.debug(f"Stripe-Signature Header: {sig_header}")
+#     logging.debug(f"Endpoint Secret: {endpoint_secret}")
 #
 #     try:
 #         event = stripe.Webhook.construct_event(
 #             payload, sig_header, endpoint_secret
 #         )
-#     except ValueError:
+#         logging.info(f"Successfully constructed event: {event['type']}")
+#     except ValueError as e:
 #         # Неверный Payload
+#         logging.error(f"Invalid payload: {e}")
 #         return 'Invalid payload', 400
-#     except stripe.error.SignatureVerificationError:
-#         # Неверный Подпись
-#         return 'Invalid signature', 400
+#     except stripe.error.SignatureVerificationError as e:
+#         # Неверная подпись
+#         logging.error(f"Invalid signature: {e}")
+#         return 'Invalid signature', 403
+#     except Exception as e:
+#         # Другие ошибки
+#         logging.error(f"Unexpected error: {e}")
+#         return 'Internal Server Error', 500
 #
 #     # Обработка события
-#     if event['type'] == 'payment_intent.succeeded':
-#         payment_intent = event['data']['object']
-#         # Обработка успешного платежа
-#         payment = Payment(
-#             user_id=payment_intent['metadata']['user_id'],
-#             amount=payment_intent['amount'] / 100,  # Преобразование из центов
-#             stripe_payment_id=payment_intent['id'],
-#             status='paid'
-#         )
-#         db.session.add(payment)
+#     event_type = event['type']
+#     event_data = event['data']['object']
 #
-#         # Логирование успешного платежа
-#         action = ActionLog(
-#             user_id=payment.user_id,
-#             action=f"Успешный платеж на сумму {payment.amount}",
-#             ip_address=request.remote_addr,
-#             status='success'
-#         )
-#         db.session.add(action)
-#         db.session.commit()
-#     elif event['type'] == 'payment_intent.payment_failed':
-#         payment_intent = event['data']['object']
-#         # Обработка неуспешного платежа
-#         payment = Payment(
-#             user_id=payment_intent['metadata']['user_id'],
-#             amount=payment_intent['amount'] / 100,
-#             stripe_payment_id=payment_intent['id'],
-#             status='failed'
-#         )
-#         db.session.add(payment)
+#     logging.info(f"Processing event type: {event_type}")
 #
-#         # Логирование неуспешного платежа
-#         action = ActionLog(
-#             user_id=payment.user_id,
-#             action=f"Неуспешный платеж на сумму {payment.amount}",
-#             ip_address=request.remote_addr,
-#             status='failure'
-#         )
-#         db.session.add(action)
-#         db.session.commit()
+#     if event_type == 'payment_intent.succeeded':
+#         handle_payment_intent_succeeded(event_data)
+#     elif event_type == 'payment_intent.payment_failed':
+#         handle_payment_intent_failed(event_data)
+#     # Добавьте другие события по мере необходимости
 #
 #     return '', 200
+#
+# def handle_payment_intent_succeeded(payment_intent):
+#     user_id = payment_intent['metadata'].get('user_id')
+#     amount = payment_intent['amount'] / 100  # Преобразование из центов
+#     stripe_payment_id = payment_intent['id']
+#
+#     payment = Payment(
+#         user_id=user_id,
+#         amount=amount,
+#         stripe_payment_id=stripe_payment_id,
+#         status='paid'
+#     )
+#     db.session.add(payment)
+#
+#     action = ActionLog(
+#         user_id=user_id,
+#         action=f"Успешный платеж на сумму {amount}",
+#         ip_address=request.remote_addr,
+#         status='success'
+#     )
+#     db.session.add(action)
+#     db.session.commit()
+#
+# def handle_payment_intent_failed(payment_intent):
+#     user_id = payment_intent['metadata'].get('user_id')
+#     amount = payment_intent['amount'] / 100
+#     stripe_payment_id = payment_intent['id']
+#
+#     payment = Payment(
+#         user_id=user_id,
+#         amount=amount,
+#         stripe_payment_id=stripe_payment_id,
+#         status='failed'
+#     )
+#     db.session.add(payment)
+#
+#     action = ActionLog(
+#         user_id=user_id,
+#         action=f"Неуспешный платеж на сумму {amount}",
+#         ip_address=request.remote_addr,
+#         status='failure'
+#     )
+#     db.session.add(action)
+#     db.session.commit()
+
+
+
+
+
+
+
+
+
+@main_bp.route('/error/<string:error_type>')
+def error_page(error_type):
+    error_messages = {
+        'invalid_credentials': {
+            'title': 'Неверные Данные',
+            'message': 'Неверный email или пароль. Пожалуйста, попробуйте снова.'
+        },
+        'invalid_token': {
+            'title': 'Некорректная Ссылка',
+            'message': 'Срок действия ссылки истёк или она некорректна.'
+        },
+        'too_many_attempts': {
+            'title': 'Слишком Много Попыток',
+            'message': 'Слишком много попыток входа. Пожалуйста, попробуйте позже.'
+        },
+        # Добавьте другие типы ошибок по необходимости
+    }
+
+    error = error_messages.get(error_type, {
+        'title': 'Ошибка',
+        'message': 'Произошла неизвестная ошибка.'
+    })
+
+    return render_template('error.html', error=error, error_type=error_type), 400
+
+
+
+
+
+
+
+# @main_bp.route('/send_test_email')
+# @login_required
+# def send_test_email():
+#     try:
+#         msg = Message('Тестовое письмо',
+#                       recipients=[current_user.email])
+#         msg.body = 'Это тестовое письмо, отправленное с помощью Flask-Mail.'
+#         mail.send(msg)
+#         flash('Тестовое письмо успешно отправлено!', 'success')
+#     except Exception as e:
+#         logger.error(f"Ошибка при отправке тестового письма: {e}")
+#         flash('Не удалось отправить тестовое письмо.', 'danger')
+#     return redirect(url_for('main.home'))
+
+
+
 
 
 

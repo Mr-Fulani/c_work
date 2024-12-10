@@ -1,0 +1,25 @@
+<!-- app/templates/error.html -->
+{% extends "base.html" %}
+
+{% block title %}{{ error.title }} - c_work{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card text-center">
+                    <div class="card-header">
+                        <h3>{{ error.title }}</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">{{ error.message }}</p>
+                        <a href="{{ url_for('main.home') }}" class="btn btn-primary">Перейти на Главную</a>
+                        {% if error_type == 'invalid_credentials' or error_type == 'invalid_token' %}
+                            <a href="{{ url_for('main.login') }}" class="btn btn-secondary">Войти</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
