@@ -1,65 +1,128 @@
-/* app/static/css/styles.css */
+/* Существующие стили остаются без изменений */
 
-/* Пример стилей для карточек */
+.image-gallery-container {
+    width: 70%;
+    max-width: 800px;
+    height: 400px;
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 1.25rem;
+    margin: 100px auto; /* Увеличено верхнее смещение для отступа от меню */
+    transition: all 400ms;
+}
+
+/* Для карточек ниже галереи можно увеличить высоту */
 .card-img-top {
-    height: 200px;
+    height: 500px; /* Увеличена высота карточек */
     object-fit: cover;
 }
 
-/* app/static/css/styles.css */
+.image-gallery-container .card {
+    flex: 1;
+    height: 100%;
+    transition: all 400ms;
+    cursor: pointer;
+    overflow: hidden;
+}
 
-/* Центрирование и максимальная ширина для Flash сообщений */
+.image-gallery-container .card img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+.image-gallery-container .card:nth-child(odd) {
+    transform: translateY(-20px);
+}
+
+.image-gallery-container .card:nth-child(even) {
+    transform: translateY(20px);
+}
+
+.image-gallery-container:hover .card:not(:hover) {
+    filter: grayscale(100%);
+}
+
+.image-gallery-container .card:hover {
+    flex: 3;
+}
+
+
+
+
+/* Темное меню */
+.navbar {
+    background-color: #2a2d32 !important; /* Тёмный фон меню */
+    color: #eaeaea;
+}
+
+.navbar a {
+    color: #eaeaea !important; /* Светлый текст в меню */
+}
+
+.navbar a:hover {
+    color: #ffffff !important; /* Белый текст при наведении */
+}
+
+/* Цвет текста для флэш-сообщений */
 .alert {
-    max-width: 500px;
-    margin: 0 auto 15px auto;
-    border-radius: 8px;
-    padding: 15px 20px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    color: #ffffff;
 }
 
-/* Анимация появления сообщений */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+
+/* Темный фон для футера */
+footer.footer {
+    background-color: #2a2d32 !important; /* Убедимся, что применяется тёмный фон */
+    color: #eaeaea !important; /* Светлый текст */
+    padding: 15px 0; /* Добавим отступы для футера */
+    text-align: center; /* Центровка текста */
+    border-top: 1px solid #444; /* Тонкая граница сверху */
 }
 
-.alert {
-    animation: fadeInUp 0.5s ease-out;
+footer.footer span {
+    color: #eaeaea !important; /* Светлый текст для текста внутри футера */
 }
 
-/* Изменение цвета кнопки закрытия для лучшей видимости */
-.alert .close {
-    color: inherit;
-    opacity: 0.7;
+/* Лёгкий сероватый фон для всей страницы */
+body {
+    background-color: #d3d3d3; /* Слегка сероватый фон */
+    color: #eaeaea; /* Светлый текст для контента */
 }
 
-.alert .close:hover {
-    opacity: 1;
+
+
+
+/* Обновленный стиль для текста в карточках */
+.card {
+    background-color: #ffffff; /* Белый фон карточки для контраста */
+    color: #333333; /* Тёмный текст для улучшенной читаемости */
+    border: 1px solid #cccccc; /* Светлая рамка для гармоничного вида */
 }
 
-/* Дополнительные стили для разных категорий сообщений */
-.alert-success {
-    background-color: #d4edda;
-    color: #155724;
+.card .card-title {
+    color: #000000; /* Чёрный цвет для заголовка карточки */
+    font-weight: bold;
 }
 
-.alert-danger {
-    background-color: #f8d7da;
-    color: #721c24;
+.card .card-body p {
+    color: #444444; /* Чуть более тёмный серый для текста описания */
 }
 
-.alert-warning {
-    background-color: #fff3cd;
-    color: #856404;
+.card .btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: #ffffff; /* Белый текст на синей кнопке */
 }
 
-.alert-info {
-    background-color: #d1ecf1;
-    color: #0c5460;
+.card .btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: #ffffff; /* Белый текст на серой кнопке */
 }
+
+
+
+

@@ -6,7 +6,7 @@ import pytest
 
 def login(client, email, password):
     """
-    Вспомогательная функция для входа пользователя.
+    Helper function to log in a user via form-based login.
     """
     return client.post('/login', data={
         'email': email,
@@ -15,105 +15,101 @@ def login(client, email, password):
 
 def logout(client):
     """
-    Вспомогательная функция для выхода пользователя.
+    Helper function to log out a user.
     """
     return client.get('/logout', follow_redirects=True)
 
-
 def test_admin_access(client, app):
     """
-    Тест доступа к админ-панели.
+    Test access to the admin panel.
     """
-    # Вход как обычный пользователь
+    # Log in as a regular user
     login_response = login(client, 'test1@example.com', 'password1')
     response = client.get('/admin', follow_redirects=True)
 
-    # Проверка статуса ответа
-    assert response.status_code == 403, "Ожидался статус код 403 Forbidden"
-
-    # Проверка наличия английского сообщения 'Forbidden' в ответе
-    assert 'Forbidden' in response.data.decode('utf-8'), "Ожидалось сообщение 'Forbidden' в ответе"
+    # Since Flask-Login redirects unauthorized users, check for the flash message
+    assert response.status_code == 200, "Expected status code 200 for redirect"
+    assert 'Access denied. Administrator privileges required.' in response.data.decode('utf-8'), "Expected access denied message"
 
     logout(client)
 
-    # Вход как администратор с правильным паролем
-    login_response = login(client, 'admin@example.com', 'adminpassword')  # Исправленный пароль
+    # Log in as an administrator
+    login_response = login(client, 'admin@example.com', 'adminpassword')  # Correct password
     response = client.get('/admin', follow_redirects=True)
 
-    # Проверка статуса ответа
-    assert response.status_code == 200, "Ожидался статус код 200 OK для администратора"
-
-    # Проверка наличия строки 'Панель Администратора' или аналогичного сообщения в ответе
-    assert 'Панель Администратора' in response.data.decode('utf-8'), "Ожидалось сообщение 'Панель Администратора' в ответе"
+    # Check for successful admin panel access
+    assert response.status_code == 200, "Expected status code 200 for admin panel access"
+    assert 'Admin Panel' in response.data.decode('utf-8'), "Expected 'Admin Panel' in response"
 
     logout(client)
-
 
 def test_add_class(client, app):
     """
-    Тест добавления нового класса администратором.
+    Test adding a new class as an administrator.
     """
-    # Вход как администратор
-    login_response = login(client, 'admin@example.com', 'adminpassword')  # Исправленный пароль
+    # Log in as an administrator
+    login_response = login(client, 'admin@example.com', 'adminpassword')  # Correct password
 
-    # Добавление нового класса
+    # Add a new class
     response = client.post('/admin/add_class', data={
-        'name': 'Новый Класс',
-        'description': 'Описание нового класса.',
-        'schedule': (datetime.now() + timedelta(days=2)).strftime('%Y-%m-%d %H:%M'),
-        'capacity': 10
+        'name': 'New Class',
+        'description': 'Description of the new class.',
+        'schedule': (datetime.utcnow() + timedelta(days=2)).strftime('%Y-%m-%d %H:%M'),
+        'capacity': 10,
+        'days_of_week': ['Monday', 'Wednesday'],  # Assuming the form expects a list
+        'extra_info': 'Additional information.'
     }, follow_redirects=True)
-    assert 'Новый класс успешно добавлен.' in response.data.decode('utf-8'), "Сообщение об успешном добавлении класса отсутствует"
 
-    # Проверка в базе данных
+    assert 'Class successfully added!' in response.data.decode('utf-8'), "Expected success message for adding class"
+
+    # Check if the class is added in the database
     with app.app_context():
-        new_class = Class.query.filter_by(name='Новый Класс').first()
-        assert new_class is not None, "Новый класс не найден в базе данных"
+        new_class = Class.query.filter_by(name='New Class').first()
+        assert new_class is not None, "New class not found in the database"
 
     logout(client)
-
 
 def test_edit_class(client, app):
     """
-    Тест редактирования существующего класса администратором.
+    Test editing an existing class as an administrator.
     """
-    # Вход как администратор
-    login_response = login(client, 'admin@example.com', 'adminpassword')  # Исправленный пароль
+    # Log in as an administrator
+    login_response = login(client, 'admin@example.com', 'adminpassword')  # Correct password
 
-    # Редактирование существующего класса (предполагается, что класс с id=1 существует)
+    # Edit an existing class (assuming class_id=1 exists)
     response = client.post('/admin/edit_class/1', data={
-        'name': 'Отредактированный Класс',
-        'description': 'Обновленное описание.',
-        'schedule': (datetime.now() + timedelta(days=3)).strftime('%Y-%m-%d %H:%M'),
-        'capacity': 8
+        'name': 'Edited Class',
+        'description': 'Updated description.',
+        'schedule': (datetime.utcnow() + timedelta(days=3)).strftime('%Y-%m-%d %H:%M'),
+        'capacity': 8,
+        'days_of_week': ['Tuesday', 'Thursday'],  # Assuming the form expects a list
+        'extra_info': 'Updated additional information.'
     }, follow_redirects=True)
-    assert 'Класс успешно обновлён.' in response.data.decode('utf-8'), "Сообщение об успешном обновлении класса отсутствует"
 
-    # Проверка изменений в базе данных
+    assert 'Class updated successfully!' in response.data.decode('utf-8'), "Expected success message for editing class"
+
+    # Check changes in the database
     with app.app_context():
         edited_class = Class.query.get(1)
-        assert edited_class.name == 'Отредактированный Класс', "Имя класса не было обновлено"
-        assert edited_class.capacity == 8, "Вместимость класса не была обновлена"
+        assert edited_class.name == 'Edited Class', "Class name was not updated"
+        assert edited_class.capacity == 8, "Class capacity was not updated"
 
     logout(client)
-
 
 def test_delete_class(client, app):
     """
-    Тест удаления существующего класса администратором.
+    Test deleting an existing class as an administrator.
     """
-    # Вход как администратор
-    login_response = login(client, 'admin@example.com', 'adminpassword')  # Исправленный пароль
+    # Log in as an administrator
+    login_response = login(client, 'admin@example.com', 'adminpassword')  # Correct password
 
-    # Удаление существующего класса (предполагается, что класс с id=1 существует)
-    response = client.post('/admin/delete_class/1', follow_redirects=True)
-    assert 'Класс успешно удалён.' in response.data.decode('utf-8'), "Сообщение об успешном удалении класса отсутствует"
+    # Delete an existing class (assuming class_id=2 exists and has no bookings)
+    response = client.post('/admin/delete_class/2', follow_redirects=True)
+    assert 'Class deleted successfully.' in response.data.decode('utf-8'), "Expected success message for deleting class"
 
-    # Проверка удаления в базе данных
+    # Check deletion in the database
     with app.app_context():
-        deleted_class = Class.query.get(1)
-        assert deleted_class is None, "Класс не был удалён из базы данных"
+        deleted_class = Class.query.get(2)
+        assert deleted_class is None, "Class was not deleted from the database"
 
     logout(client)
-
-

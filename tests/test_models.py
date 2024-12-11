@@ -1,4 +1,6 @@
 # tests/test_models.py
+from datetime import datetime
+
 from app import db
 from app.models import User, Class, Booking, Payment
 
@@ -31,6 +33,7 @@ def test_class_model(app):
         assert class_ is not None
         assert class_.capacity == 10
 
+
 def test_booking_model(app):
     """
     Тест модели бронирования.
@@ -38,13 +41,29 @@ def test_booking_model(app):
     with app.app_context():
         user = User.query.filter_by(email='test1@example.com').first()
         class_ = Class.query.filter_by(name='Yoga').first()
-        booking = Booking(user_id=user.id, class_id=class_.id, status='confirmed')
+
+        # Убедитесь, что класс найден
+        assert class_ is not None, "Class 'Yoga' should exist in the test database."
+
+        # Предположим, что 'Yoga' проводится по понедельникам и средам
+        # Установим день бронирования на понедельник
+        booking_day = 'Monday'
+
+        booking = Booking(
+            user_id=user.id,
+            class_id=class_.id,
+            booking_date=datetime.utcnow(),
+            status='confirmed',
+            day=booking_day  # Устанавливаем обязательное поле 'day'
+        )
         db.session.add(booking)
         db.session.commit()
 
+        # Проверяем, что бронирование было успешно создано
         fetched_booking = Booking.query.filter_by(user_id=user.id, class_id=class_.id).first()
-        assert fetched_booking is not None
-        assert fetched_booking.status == 'confirmed'
+        assert fetched_booking is not None, "Booking should be created successfully."
+        assert fetched_booking.status == 'confirmed', "Booking status should be 'confirmed'."
+        assert fetched_booking.day == booking_day, f"Booking day should be '{booking_day}'."
 
 
 

@@ -7,18 +7,29 @@
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
     <!-- Добавьте свои стили -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .navbar-nav.main-nav {
+            flex-direction: row;
+        }
+        .main-nav .nav-item {
+            margin-right: 15px;
+        }
+        .user-section {
+            display: flex;
+            align-items: center;
+        }
+        .user-section img {
+            margin-left: 15px;
+        }
+    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
     <!-- Навигация -->
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <a class="navbar-brand" href="{{ url_for('main.home') }}">c_work</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ml-auto">
+            <ul class="navbar-nav main-nav mr-auto">
                 {% if current_user.is_authenticated %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.classes') }}">Классы</a>
@@ -34,27 +45,21 @@
                             <a class="nav-link" href="{{ url_for('admin.admin_panel') }}">Админ Панель</a>
                         </li>
                     {% endif %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
-                           aria-haspopup="true" aria-expanded="false">
-                            <img src="{{ url_for('static', filename='images/' + (current_user.avatar or 'user.png')) }}"
-                                 alt="Avatar" class="rounded-circle" width="30" height="30">
-                            {{ current_user.username }}
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
-                            <a class="dropdown-item" href="{{ url_for('main.profile') }}">Профиль</a>
-                            <a class="dropdown-item" href="{{ url_for('main.logout') }}">Выйти</a>
-                        </div>
-                    </li>
-                {% else %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.login') }}">Войти</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.register') }}">Зарегистрироваться</a>
-                    </li>
                 {% endif %}
             </ul>
+            <div class="user-section">
+                {% if current_user.is_authenticated %}
+                    <div>
+                        <a href="{{ url_for('main.profile') }}">{{ current_user.username }}</a>
+                        <a href="{{ url_for('main.logout') }}" class="ml-2">Выйти</a>
+                    </div>
+                    <img src="{{ url_for('static', filename='images/' + (current_user.avatar or 'user.png')) }}"
+                         alt="Avatar" class="rounded-circle" width="30" height="30">
+                {% else %}
+                    <a class="nav-link" href="{{ url_for('main.login') }}">Войти</a>
+                    <a class="nav-link" href="{{ url_for('main.register') }}">Зарегистрироваться</a>
+                {% endif %}
+            </div>
         </div>
     </nav>
 

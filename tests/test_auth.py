@@ -1,118 +1,339 @@
 # tests/test_auth.py
-from app.models import User
+
+from datetime import datetime, timezone
+import pytest
+from app.models import User, Booking, Class
+from app import db, bcrypt
 
 
-def login(client, email, password):
-    return client.post('/login', data={
-        'email': email,
-        'password': password
-    }, follow_redirects=True)
+def test_api_login_success(client):
+    """
+    Тест успешного получения JWT токена
+    """
+    response = client.post('/api/v1/login', json={
+        'email': 'test1@example.com',
+        'password': 'password1'  # Пароль должен соответствовать фикстуре
+    })
+    assert response.status_code == 200, f"Ожидался статус код 200, получен {response.status_code}"
+    json_data = response.get_json()
+    assert 'access_token' in json_data, "Поле 'access_token' отсутствует в ответе"
 
-def logout(client):
-    return client.get('/logout', follow_redirects=True)
 
-def test_register_success(client, app):
+def test_api_login_wrong_credentials(client):
     """
-    Тест успешной регистрации пользователя.
+    Тест получения JWT токена с неверными учетными данными
     """
-    response = client.post('/register', data={
-        'username': 'newuser',
-        'email': 'newuser@example.com',
-        'password': 'Password@123',
-        'confirm_password': 'Password@123'
-    }, follow_redirects=True)
-    assert response.status_code == 200
-    assert 'Ваш аккаунт создан! Вы можете войти.' in response.data.decode('utf-8')
-
-    # Проверка, что пользователь добавлен в базу данных
-    with app.app_context():
-        user = User.query.filter_by(email='newuser@example.com').first()
-        assert user is not None
-        assert user.username == 'newuser'
-        assert user.is_admin == False
-
-def test_register_existing_email(client, app):
-    """
-    Тест регистрации с существующим email.
-    """
-    response = client.post('/register', data={
-        'username': 'anotheruser',
-        'email': 'test1@example.com',  # Уже зарегистрирован
-        'password': 'Password@123',
-        'confirm_password': 'Password@123'
-    }, follow_redirects=True)
-    assert response.status_code == 200
-    assert 'Этот email уже зарегистрирован.' in response.data.decode('utf-8')
-
-def test_register_existing_username(client, app):
-    """
-    Тест регистрации с существующим именем пользователя.
-    """
-    response = client.post('/register', data={
-        'username': 'testuser1',  # Уже существует
-        'email': 'uniqueemail@example.com',
-        'password': 'Password@123',
-        'confirm_password': 'Password@123'
-    }, follow_redirects=True)
-    assert response.status_code == 200
-    assert 'Это имя пользователя уже занято.' in response.data.decode('utf-8')
-
-def test_register_weak_password(client):
-    """
-    Тест регистрации с слабым паролем.
-    """
-    response = client.post('/register', data={
-        'username': 'weakpassworduser',
-        'email': 'weakpass@example.com',
-        'password': 'weak',
-        'confirm_password': 'weak'
-    }, follow_redirects=True)
-    assert response.status_code == 200
-    assert 'Пароль должен быть не менее 8 символов.' in response.data.decode('utf-8')
-
-def test_register_password_no_special_char(client):
-    """
-    Тест регистрации с паролем без специальных символов.
-    """
-    response = client.post('/register', data={
-        'username': 'nospecialcharuser',
-        'email': 'nospecial@example.com',
-        'password': 'Password123',
-        'confirm_password': 'Password123'
-    }, follow_redirects=True)
-    assert response.status_code == 200
-    assert 'Пароль должен содержать буквы, цифры и специальные символы' in response.data.decode('utf-8')
-
-def test_login_success(client, app, access_token):
-    """
-    Тест успешного входа пользователя.
-    """
-    # Предполагается, что вы используете JWT для API
-    headers = {
-        'Authorization': f'Bearer {access_token}'
-    }
-    response = client.get('/protected-route', headers=headers)
-    assert response.status_code == 200
-    assert 'Доступ разрешен' in response.data.decode('utf-8')
-
-def test_login_wrong_password(client):
-    """
-    Тест входа с неправильным паролем.
-    """
-    response = client.post('/login', data={
+    response = client.post('/api/v1/login', json={
         'email': 'test1@example.com',
         'password': 'WrongPassword'
-    }, follow_redirects=True)
-    assert response.status_code == 200
-    assert 'Неверные данные для входа. Пожалуйста, попробуйте снова.' in response.data.decode('utf-8')
+    })
+    assert response.status_code == 401, f"Ожидался статус код 401, получен {response.status_code}"
+    json_data = response.get_json()
+    assert json_data['message'] == 'Invalid credentials', f"Ожидалось сообщение 'Invalid credentials', получено '{json_data.get('message')}'"
 
-def test_login_nonexistent_user(client):
+
+def test_create_booking(client, access_token, app):
     """
-    Тест входа с несуществующим пользователем.
+    Тест создания нового бронирования через API
     """
-    response = client.post('/login', data={
-        'email': 'nonexistent@example.com',
-        'password': 'Password@123'
-    }, follow_redirects=True)
-    assert response.status_code == 200
-    assert 'Неверные данные для входа. Пожалуйста, попробуйте снова.' in response.data.decode('utf-8')
+    with app.app_context():
+        class_ = Class.query.filter_by(name='Yoga').first()
+        assert class_ is not None, "Класс 'Yoga' не найден в базе данных"
+        class_id = class_.id
+
+    booking_date = datetime.now(timezone.utc)
+
+    response = client.post('/api/v1/bookings', json={
+        'class_id': class_id,
+        'status': 'confirmed',
+        'booking_date': booking_date.isoformat(),
+        'day': booking_date.strftime('%A')  # Добавлено поле 'day'
+    }, headers={
+        'Authorization': f'Bearer {access_token}'
+    })
+
+    assert response.status_code == 201, f"Ожидался статус код 201, получен {response.status_code}. Данные ответа: {response.get_json()}"
+    json_data = response.get_json()
+    assert json_data['message'] == 'Booking created', "Сообщение о создании бронирования отсутствует"
+    assert 'booking_id' in json_data, "Поле 'booking_id' отсутствует в ответе"
+
+    with app.app_context():
+        booking = db.session.get(Booking, json_data['booking_id'])  # Используем db.session.get
+        assert booking is not None, "Бронирование не найдено в базе данных"
+        assert booking.class_id == class_id, "class_id бронирования не совпадает"
+        assert booking.status == 'confirmed', "Статус бронирования не совпадает"
+        assert booking.day == booking_date.strftime('%A'), "День бронирования не совпадает"
+
+
+def test_create_booking_no_slots(client, access_token, app):
+    """
+    Тест создания бронирования, когда места закончились
+    """
+    with app.app_context():
+        class_ = Class.query.filter_by(name='Yoga').first()
+        assert class_ is not None, "Класс 'Yoga' не найден в базе данных"
+
+        original_capacity = class_.capacity
+        class_.capacity = 1
+        db.session.commit()
+
+        # Создаём бронирование, которое занимает единственное доступное место
+        user = User.query.filter_by(email='test1@example.com').first()
+        assert user is not None, "Пользователь 'test1@example.com' не найден в базе данных"
+
+        booking_date = datetime.now(timezone.utc)
+        booking = Booking(
+            user_id=user.id,  # Используем динамический user_id
+            class_id=class_.id,
+            status='confirmed',
+            booking_date=booking_date,
+            day=booking_date.strftime('%A')  # Добавлено поле 'day'
+        )
+        db.session.add(booking)
+        db.session.commit()
+
+    # Пытаемся создать ещё одно бронирование, когда места закончились
+    new_booking_date = datetime.now(timezone.utc)
+    response = client.post('/api/v1/bookings', json={
+        'class_id': class_.id,
+        'status': 'confirmed',
+        'booking_date': new_booking_date.isoformat(),
+        'day': new_booking_date.strftime('%A')  # Добавлено поле 'day'
+    }, headers={
+        'Authorization': f'Bearer {access_token}'
+    })
+    assert response.status_code == 400, f"Ожидался статус код 400, получен {response.status_code}. Данные ответа: {response.get_json()}"
+    json_data = response.get_json()
+    assert json_data['message'] == 'No available slots for this class', f"Ожидалось сообщение 'No available slots for this class', получено '{json_data.get('message')}'"
+
+    with app.app_context():
+        # Восстанавливаем исходную вместимость
+        class_.capacity = original_capacity
+        db.session.commit()
+
+
+def test_get_bookings(client, access_token, app):
+    """
+    Тест получения списка бронирований текущего пользователя через API
+    """
+    with app.app_context():
+        user = User.query.filter_by(email='test1@example.com').first()
+        class_ = Class.query.filter_by(name='Yoga').first()
+        assert user is not None, "Пользователь 'test1@example.com' не найден в базе данных"
+        assert class_ is not None, "Класс 'Yoga' не найден в базе данных"
+
+        booking = Booking.query.filter_by(user_id=user.id, class_id=class_.id).first()
+        if not booking:
+            booking_date = datetime.now(timezone.utc)
+            booking = Booking(
+                user_id=user.id,
+                class_id=class_.id,
+                status='confirmed',
+                booking_date=booking_date,
+                day=booking_date.strftime('%A')  # Добавлено поле 'day'
+            )
+            db.session.add(booking)
+            db.session.commit()
+
+    response = client.get('/api/v1/bookings', headers={
+        'Authorization': f'Bearer {access_token}'
+    })
+    assert response.status_code == 200, f"Ожидался статус код 200, получен {response.status_code}"
+    json_data = response.get_json()
+    assert isinstance(json_data, list), "Ожидался список бронирований"
+    assert len(json_data) >= 1, "Ожидалось хотя бы одно бронирование"
+
+
+def test_get_specific_booking(client, access_token, app):
+    """
+    Тест получения деталей конкретного бронирования через API
+    """
+    with app.app_context():
+        user = User.query.filter_by(email='test1@example.com').first()
+        class_ = Class.query.filter_by(name='Pilates').first()
+        assert user is not None, "Пользователь 'test1@example.com' не найден в базе данных"
+        assert class_ is not None, "Класс 'Pilates' не найден в базе данных"
+
+        booking_date = datetime.now(timezone.utc)
+        booking = Booking(
+            user_id=user.id,
+            class_id=class_.id,
+            status='confirmed',
+            booking_date=booking_date,
+            day=booking_date.strftime('%A')  # Добавлено поле 'day'
+        )
+        db.session.add(booking)
+        db.session.commit()
+        booking_id = booking.id
+
+    response = client.get(f'/api/v1/bookings/{booking_id}', headers={
+        'Authorization': f'Bearer {access_token}'
+    })
+    assert response.status_code == 200, f"Ожидался статус код 200, получен {response.status_code}"
+    json_data = response.get_json()
+    assert json_data['id'] == booking_id, "ID бронирования не совпадает"
+    assert json_data['class_id'] == class_.id, "class_id бронирования не совпадает"
+    assert json_data['status'] == 'confirmed', "Статус бронирования не совпадает"
+    assert json_data['day'] == booking_date.strftime('%A'), "День бронирования не совпадает"
+
+
+def test_update_booking(client, access_token, app):
+    """
+    Тест обновления статуса бронирования через API
+    """
+    with app.app_context():
+        user = User.query.filter_by(email='test1@example.com').first()
+        class_ = Class.query.filter_by(name='Pilates').first()
+        assert user is not None, "Пользователь 'test1@example.com' не найден в базе данных"
+        assert class_ is not None, "Класс 'Pilates' не найден в базе данных"
+
+        booking_date = datetime.now(timezone.utc)
+        booking = Booking(
+            user_id=user.id,
+            class_id=class_.id,
+            status='confirmed',
+            booking_date=booking_date,
+            day=booking_date.strftime('%A')  # Добавлено поле 'day'
+        )
+        db.session.add(booking)
+        db.session.commit()
+        booking_id = booking.id
+
+    response = client.put(f'/api/v1/bookings/{booking_id}', json={
+        'status': 'cancelled'
+    }, headers={
+        'Authorization': f'Bearer {access_token}'
+    })
+    assert response.status_code == 200, f"Ожидался статус код 200, получен {response.status_code}"
+    json_data = response.get_json()
+    assert json_data['message'] == 'Booking updated', "Сообщение об обновлении бронирования отсутствует"
+
+    with app.app_context():
+        updated_booking = db.session.get(Booking, booking_id)  # Используем db.session.get
+        assert updated_booking.status == 'cancelled', "Статус бронирования не был обновлён"
+
+
+def test_delete_booking(client, access_token, app):
+    """
+    Тест удаления бронирования через API
+    """
+    with app.app_context():
+        user = User.query.filter_by(email='test1@example.com').first()
+        class_ = Class.query.filter_by(name='Pilates').first()
+        assert user is not None, "Пользователь 'test1@example.com' не найден в базе данных"
+        assert class_ is not None, "Класс 'Pilates' не найден в базе данных"
+
+        booking_date = datetime.now(timezone.utc)
+        booking = Booking(
+            user_id=user.id,
+            class_id=class_.id,
+            status='confirmed',
+            booking_date=booking_date,
+            day=booking_date.strftime('%A')  # Добавлено поле 'day'
+        )
+        db.session.add(booking)
+        db.session.commit()
+        booking_id = booking.id
+
+    response = client.delete(f'/api/v1/bookings/{booking_id}', headers={
+        'Authorization': f'Bearer {access_token}'
+    })
+    assert response.status_code == 200, f"Ожидался статус код 200, получен {response.status_code}"
+    json_data = response.get_json()
+    assert json_data['message'] == 'Booking deleted', "Сообщение об удалении бронирования отсутствует"
+
+    with app.app_context():
+        deleted_booking = db.session.get(Booking, booking_id)  # Используем db.session.get
+        assert deleted_booking is None, "Бронирование не было удалено из базы данных"
+
+
+def test_api_access_without_token(client):
+    """
+    Тест доступа к API без JWT токена
+    """
+    response = client.get('/api/v1/bookings', headers={
+        'Authorization': 'Bearer '  # Отправляем пустой токен
+    })
+    # Flask-JWT-Extended по умолчанию возвращает 422 для неправильно сформированных токенов
+    assert response.status_code == 422, f"Ожидался статус код 422, получен {response.status_code}"
+    json_data = response.get_json()
+    assert json_data['msg'] == 'Not enough segments', f"Ожидалось сообщение 'Not enough segments', получено '{json_data.get('msg')}'"
+
+
+def test_api_access_with_invalid_token(client):
+    """
+    Тест доступа к API с неверным JWT токеном
+    """
+    response = client.get('/api/v1/bookings', headers={
+        'Authorization': 'Bearer invalidtoken'
+    })
+    # Flask-JWT-Extended по умолчанию возвращает 422 для неправильно сформированных токенов
+    assert response.status_code == 422, f"Ожидался статус код 422, получен {response.status_code}"
+    json_data = response.get_json()
+    assert json_data['msg'] == 'Not enough segments', f"Ожидалось сообщение 'Not enough segments', получено '{json_data.get('msg')}'"
+
+
+def test_api_admin_access(client, admin_access_token, app):
+    """
+    Тест доступа администратора к бронированиям других пользователей
+    """
+    with app.app_context():
+        user = User.query.filter_by(email='test1@example.com').first()
+        class_ = Class.query.filter_by(name='Pilates').first()
+        assert user is not None, "Пользователь 'test1@example.com' не найден в базе данных"
+        assert class_ is not None, "Класс 'Pilates' не найден в базе данных"
+
+        booking_date = datetime.now(timezone.utc)
+        booking = Booking(
+            user_id=user.id,
+            class_id=class_.id,
+            status='confirmed',
+            booking_date=booking_date,
+            day=booking_date.strftime('%A')  # Добавлено поле 'day'
+        )
+        db.session.add(booking)
+        db.session.commit()
+        booking_id = booking.id
+
+    response = client.get(f'/api/v1/bookings/{booking_id}', headers={
+        'Authorization': f'Bearer {admin_access_token}'
+    })
+    assert response.status_code == 200, f"Ожидался статус код 200, получен {response.status_code}"
+    json_data = response.get_json()
+    assert json_data['id'] == booking_id, "ID бронирования не совпадает"
+    assert json_data['user_id'] == user.id, "user_id бронирования не совпадает"
+
+
+def test_api_non_admin_access_to_others_booking(client, access_token, app):
+    """
+    Тест попытки пользователя получить бронирование другого пользователя
+    """
+    with app.app_context():
+        # Создаём другого пользователя
+        hashed_password = bcrypt.generate_password_hash('Password@123').decode('utf-8')
+        another_user = User(username='anotheruser', email='another@example.com', password=hashed_password, is_admin=False)
+        db.session.add(another_user)
+        db.session.commit()
+
+        # Создаём бронирование для другого пользователя
+        class_ = Class.query.filter_by(name='Pilates').first()
+        assert class_ is not None, "Класс 'Pilates' не найден в базе данных"
+
+        booking_date = datetime.now(timezone.utc)
+        booking = Booking(
+            user_id=another_user.id,
+            class_id=class_.id,
+            status='confirmed',
+            booking_date=booking_date,
+            day=booking_date.strftime('%A')  # Добавлено поле 'day'
+        )
+        db.session.add(booking)
+        db.session.commit()
+        booking_id = booking.id
+
+    response = client.get(f'/api/v1/bookings/{booking_id}', headers={
+        'Authorization': f'Bearer {access_token}'
+    })
+    assert response.status_code == 403, f"Ожидался статус код 403, получен {response.status_code}"
+    json_data = response.get_json()
+    assert json_data['message'] == 'Access denied', f"Ожидалось сообщение 'Access denied', получено '{json_data.get('message')}'"

@@ -17,9 +17,10 @@ from app.webhooks import webhook_bp
 from config import Config
 from flask_migrate import Migrate
 
-
+# Initialize Limiter for rate limiting
 limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
 
+# Initialize Flask extensions
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
@@ -31,27 +32,30 @@ mail = Mail()
 
 def create_app(config_class=Config):
     """
-    Фабричная функция создания экземпляра приложения Flask.
+    Factory function to create a Flask application instance.
 
-    Настройки приложения берутся из config_class.
-    Инициализируются расширения: db, bcrypt, login_manager, mail, миграции, JWT.
-    Регистрация blueprint'ов.
+    The application settings are taken from config_class.
+    Initializes extensions: db, bcrypt, login_manager, mail, migrations, JWT.
+    Registers blueprints.
 
-    Возвращает:
-        app (Flask): Инициализированное Flask-приложение.
+    Args:
+        config_class (class): The configuration class to use for the application.
+
+    Returns:
+        Flask: The initialized Flask application instance.
     """
-    app = Flask(__name__)
+    app = Flask(__name__, static_url_path='/static')
     app.config.from_object(config_class)
 
-    # Разрешение CORS
+    # Enable Cross-Origin Resource Sharing (CORS)
     CORS(app)
 
-    # Настройка логирования
+    # Configure logging
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger(__name__)
-    logger.info("Инициализация Flask-приложения.")
+    logger.info("Initializing Flask application.")
 
-    # Настройки Flask-Mail
+    # Flask-Mail configuration
     app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
     app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
     app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True') == 'True'
@@ -59,9 +63,10 @@ def create_app(config_class=Config):
     app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
     app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', ('c_work Support', 'noreply@yourdomain.com'))
 
-    # Настройка JWT
+    # Initialize JWT
     jwt.init_app(app)
 
+    # Initialize other extensions
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
@@ -69,46 +74,41 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     limiter.init_app(app)
 
-    # Настройки для загрузки изображений
-    # Папка, куда будут сохраняться картинки классов
-    app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'images')
-    # Допустимые расширения файлов
+    # Image upload settings
+    # Folder where class images will be saved
+    app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'images')
+    # Allowed file extensions for uploads
     app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+    # Maximum file size allowed for uploads: 16 MB
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
     from app.routes import main_bp
     from app.admin_routes import admin_bp
-    from app.api import api_bp  # Предполагается, что api_bp определён в app/api.py
+    from app.api import api_bp  # Assumes api_bp is defined in app/api.py
 
-    # Регистрация Blueprint'ов
+    # Register Blueprints
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(webhook_bp)
 
-    from app import models  # Импорт моделей для Alembic
+    from app import models  # Import models for Alembic
 
-    # Временно отключаем все защиты для тестирования
-    @app.before_request
-    def before_request_func():
-        # Список эндпоинтов, исключённых из аутентификации
-        allowed_endpoints = ['webhooks.stripe_webhook', 'webhooks.test_webhook', 'static']
-        if request.endpoint not in allowed_endpoints:
-            # Временно отключаем проверку JWT и другие проверки
-            # try:
-            #     verify_jwt_in_request()
-            # except:
-            #     abort(403)
-            pass  # Никакие проверки не выполняются
+    # # Enable JWT authentication for API routes
+    # @app.before_request
+    # def before_request_func():
+    #     """
+    #     Apply JWT verification only to API routes.
+    #     """
+    #     if request.path.startswith('/api/'):
+    #         try:
+    #             verify_jwt_in_request()
+    #         except:
+    #             abort(403)  # Forbidden
 
-    # Вывод всех зарегистрированных маршрутов для отладки
+    # Log all registered routes for debugging purposes
     with app.app_context():
         for rule in app.url_map.iter_rules():
             logger.debug(f"Route: {rule.rule} -> {rule.endpoint}")
 
     return app
-
-
-
-
-

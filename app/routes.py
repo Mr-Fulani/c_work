@@ -1,4 +1,3 @@
-# app/routes.py
 import logging
 import os
 import re
@@ -10,66 +9,71 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import login_user, current_user, logout_user, login_required
-from flask_wtf import CSRFProtect
+from flask_mail import Message
+from itsdangerous import URLSafeTimedSerializer
 from werkzeug.utils import secure_filename
 
-from app import db, bcrypt, limiter
+from app import db, bcrypt
+from app import mail  # Ensure Flask-Mail is initialized
 from app.forms import RegistrationForm, BookingForm, CancelBookingForm, UpdateProfileForm, SelectDayForm, \
     ChangePasswordForm, LoginForm, ResetPasswordForm, ResetPasswordRequestForm, PaymentForm
-from app.models import User, Class, Booking, ActionLog, Payment
+from app.models import User, Class, Booking, ActionLog
 from app.utils import allowed_file
-
-
-
-
-from itsdangerous import URLSafeTimedSerializer
-from flask_mail import Message
-from app import mail  # Убедитесь, что Flask-Mail инициализирован
-
-
-
-
-
-
-
 
 main_bp = Blueprint('main', __name__)
 
 logger = logging.getLogger(__name__)
 
-
-# Инициализация Flask-Limiter
+# Initialize Flask-Limiter
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"]
 )
 
-
-
 MAX_FAILED_ATTEMPTS = 5
 BLOCK_DURATION = timedelta(minutes=15)
 
 
-
-
 @main_bp.errorhandler(500)
 def internal_error(error):
+    """
+    Handles internal server errors (HTTP 500).
+
+    Args:
+        error: The error object.
+
+    Returns:
+        Response: Rendered 500 error page.
+    """
     return render_template('500.html'), 500
 
 
 @main_bp.route('/')
 @main_bp.route('/home')
 def home():
+    """
+    Home page route.
+
+    Returns:
+        Response: Rendered home page template with class data.
+    """
     classes = Class.query.all()
     return render_template('home.html', classes=classes)
 
 
-
-
 @main_bp.route('/register', methods=['GET', 'POST'])
 def register():
+    """
+    User registration route.
+
+    Handles user registration by validating the form, saving user details, and logging the action.
+
+    Returns:
+        Response: Redirects to the login page upon success or renders the registration page upon failure.
+    """
     if current_user.is_authenticated:
         return redirect(url_for('main.home'))
+
     form = RegistrationForm()
     if form.validate_on_submit():
         username = form.username.data.strip()
@@ -80,38 +84,43 @@ def register():
         db.session.add(user)
         db.session.commit()
 
-        # Логирование действия регистрации
+        # Log registration action
         action = ActionLog(
             user_id=user.id,
-            action='Регистрация',
+            action='Registration',
             ip_address=request.remote_addr,
             status='success'
         )
         db.session.add(action)
         db.session.commit()
 
-        flash('Ваш аккаунт создан! Вы можете войти.', 'success')
+        flash('Your account has been created! You can now log in.', 'success')
         return redirect(url_for('main.login'))
     elif request.method == 'POST':
-        # Логирование неуспешной попытки регистрации
+        # Log failed registration attempt
         action = ActionLog(
             user_id=None,
-            action='Регистрация',
+            action='Registration',
             ip_address=request.remote_addr,
             status='failure'
         )
         db.session.add(action)
         db.session.commit()
+
     return render_template('register.html', form=form)
-
-
-
-
 
 
 @main_bp.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per minute", methods=["POST"], error_message="Too many login attempts. Please try again later.")
 def login():
+    """
+    User login route.
+
+    Validates user credentials, logs successful or failed login attempts, and enforces rate limiting.
+
+    Returns:
+        Response: Redirects to the home page upon success or renders the login page upon failure.
+    """
     if current_user.is_authenticated:
         return redirect(url_for('main.home'))
 
@@ -120,7 +129,7 @@ def login():
         identifier = form.email_or_username.data.strip()
         password = form.password.data
 
-        # Определяем, является ли идентификатор email с помощью регулярного выражения
+        # Determine if identifier is an email using regex
         email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
         if re.match(email_regex, identifier):
             user = User.query.filter_by(email=identifier.lower()).first()
@@ -128,7 +137,7 @@ def login():
             user = User.query.filter_by(username=identifier).first()
 
         if user:
-            # Получение количества неудачных попыток входа за последние 15 минут
+            # Get number of failed login attempts in the last 15 minutes
             recent_failed_logins = ActionLog.query.filter(
                 ActionLog.user_id == user.id,
                 ActionLog.action == 'Login',
@@ -137,7 +146,7 @@ def login():
             ).count()
 
             if recent_failed_logins >= MAX_FAILED_ATTEMPTS:
-                # Логирование неуспешной попытки входа
+                # Log failed login attempt
                 action = ActionLog(
                     user_id=user.id,
                     action='Login',
@@ -154,7 +163,7 @@ def login():
                 user.last_login = datetime.utcnow()
                 db.session.commit()
 
-                # Логирование успешного входа
+                # Log successful login
                 action = ActionLog(
                     user_id=user.id,
                     action='Login',
@@ -166,7 +175,7 @@ def login():
 
                 return redirect(url_for('main.home'))
             else:
-                # Логирование неуспешной попытки входа
+                # Log failed login attempt
                 action = ActionLog(
                     user_id=user.id,
                     action='Login',
@@ -178,7 +187,7 @@ def login():
 
                 return redirect(url_for('main.error_page', error_type='invalid_credentials'))
         else:
-            # Логирование неуспешной попытки входа (пользователь не найден)
+            # Log failed login attempt (user not found)
             action = ActionLog(
                 user_id=None,
                 action='Login',
@@ -191,6 +200,8 @@ def login():
             return redirect(url_for('main.error_page', error_type='invalid_credentials'))
 
     return render_template('login.html', form=form)
+
+
 
 
 
@@ -723,130 +734,37 @@ def process_payment():
 
 
 
-
-
-
-
-
-
 @main_bp.route('/payment_success')
 @login_required
 def payment_success():
+    action = ActionLog(
+        user_id=current_user.id,
+        action='Успешный платёж',
+        ip_address=request.remote_addr,
+        status='success'
+    )
+    db.session.add(action)
+    db.session.commit()
+    logger.info(f"User {current_user.id} completed a payment successfully.")
     return render_template('payment_success.html')
+
+
 
 
 
 @main_bp.route('/payment_failure')
 @login_required
 def payment_failure():
+    action = ActionLog(
+        user_id=current_user.id,
+        action='Ошибка платежа',
+        ip_address=request.remote_addr,
+        status='failure'
+    )
+    db.session.add(action)
+    db.session.commit()
+    logger.warning(f"User {current_user.id} encountered a payment failure.")
     return render_template('payment_failure.html')
-
-
-
-# @main_bp.route('/test_webhook', methods=['POST'])
-# def test_webhook():
-#     logger.info("Test webhook received")
-#     return 'Webhook received', 200
-#
-#
-#
-#
-#
-# # Инициализация CSRF и Limiter
-# csrf = CSRFProtect()
-# limiter = Limiter(key_func=get_remote_address)
-#
-# @main_bp.route('/stripe_webhook', methods=['POST'])
-# @limiter.exempt      # Исключаем маршрут из ограничения по скорости
-# @csrf.exempt         # Исключаем маршрут из CSRF-защиты
-# def stripe_webhook():
-#     payload = request.get_data(as_text=True)
-#     sig_header = request.headers.get('Stripe-Signature')
-#     endpoint_secret = current_app.config['STRIPE_ENDPOINT_SECRET']
-#
-#     logging.info("Received webhook payload")
-#     logging.debug(f"Payload: {payload}")
-#     logging.debug(f"Stripe-Signature Header: {sig_header}")
-#     logging.debug(f"Endpoint Secret: {endpoint_secret}")
-#
-#     try:
-#         event = stripe.Webhook.construct_event(
-#             payload, sig_header, endpoint_secret
-#         )
-#         logging.info(f"Successfully constructed event: {event['type']}")
-#     except ValueError as e:
-#         # Неверный Payload
-#         logging.error(f"Invalid payload: {e}")
-#         return 'Invalid payload', 400
-#     except stripe.error.SignatureVerificationError as e:
-#         # Неверная подпись
-#         logging.error(f"Invalid signature: {e}")
-#         return 'Invalid signature', 403
-#     except Exception as e:
-#         # Другие ошибки
-#         logging.error(f"Unexpected error: {e}")
-#         return 'Internal Server Error', 500
-#
-#     # Обработка события
-#     event_type = event['type']
-#     event_data = event['data']['object']
-#
-#     logging.info(f"Processing event type: {event_type}")
-#
-#     if event_type == 'payment_intent.succeeded':
-#         handle_payment_intent_succeeded(event_data)
-#     elif event_type == 'payment_intent.payment_failed':
-#         handle_payment_intent_failed(event_data)
-#     # Добавьте другие события по мере необходимости
-#
-#     return '', 200
-#
-# def handle_payment_intent_succeeded(payment_intent):
-#     user_id = payment_intent['metadata'].get('user_id')
-#     amount = payment_intent['amount'] / 100  # Преобразование из центов
-#     stripe_payment_id = payment_intent['id']
-#
-#     payment = Payment(
-#         user_id=user_id,
-#         amount=amount,
-#         stripe_payment_id=stripe_payment_id,
-#         status='paid'
-#     )
-#     db.session.add(payment)
-#
-#     action = ActionLog(
-#         user_id=user_id,
-#         action=f"Успешный платеж на сумму {amount}",
-#         ip_address=request.remote_addr,
-#         status='success'
-#     )
-#     db.session.add(action)
-#     db.session.commit()
-#
-# def handle_payment_intent_failed(payment_intent):
-#     user_id = payment_intent['metadata'].get('user_id')
-#     amount = payment_intent['amount'] / 100
-#     stripe_payment_id = payment_intent['id']
-#
-#     payment = Payment(
-#         user_id=user_id,
-#         amount=amount,
-#         stripe_payment_id=stripe_payment_id,
-#         status='failed'
-#     )
-#     db.session.add(payment)
-#
-#     action = ActionLog(
-#         user_id=user_id,
-#         action=f"Неуспешный платеж на сумму {amount}",
-#         ip_address=request.remote_addr,
-#         status='failure'
-#     )
-#     db.session.add(action)
-#     db.session.commit()
-
-
-
 
 
 
@@ -868,7 +786,6 @@ def error_page(error_type):
             'title': 'Слишком Много Попыток',
             'message': 'Слишком много попыток входа. Пожалуйста, попробуйте позже.'
         },
-        # Добавьте другие типы ошибок по необходимости
     }
 
     error = error_messages.get(error_type, {
@@ -876,7 +793,19 @@ def error_page(error_type):
         'message': 'Произошла неизвестная ошибка.'
     })
 
+    action = ActionLog(
+        user_id=current_user.id if current_user.is_authenticated else None,
+        action=f"Страница ошибки: {error_type}",
+        ip_address=request.remote_addr,
+        status='failure'
+    )
+    db.session.add(action)
+    db.session.commit()
+
+    logger.error(f"Error page accessed: {error_type}. Message: {error['message']}")
     return render_template('error.html', error=error, error_type=error_type), 400
+
+
 
 
 
